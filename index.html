@@ -89,6 +89,7 @@
   .stage .pv { position: absolute; right: 12px; bottom: 12px; width: 200px; aspect-ratio: 4/3; border-radius: 14px; overflow: hidden; border: 3px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.18); background: #000; }
   .stage .pv video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
   .stage .pv .st { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; padding: 4px 8px; text-align: center; }
+  .stage .fwarn { position: absolute; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 4; background: rgba(224,49,49,.85); color: #fff; font-size: 14px; padding: 6px 14px; border-radius: 999px; pointer-events: none; }
   .stage .dbg { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: #868E96; font-weight: 500; }
   .loading { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-size: 18px; color: var(--sub); background: #FDFDFE; z-index: 6; padding: 20px; line-height: 1.7; }
   .loading .emo { font-size: 54px; display: block; }
@@ -528,7 +529,7 @@ function jaSay(t) {
      せってい
      ============================================================ */
   const ST_KEY = 'mieel-manazashi-st';
-  const st = Object.assign({ kid: '', calPts: 9, cptMin: 3, cptMode: 'tap', cptPair: 0, pairSec: 5, pairCats: ['face', 'move', 'color', 'moji', 'kira', 'many'], viewSec: 20, sound: true, debug: false, preview: true }, (() => { try { return JSON.parse(localStorage.getItem(ST_KEY) || '{}'); } catch (e) { return {}; } })());
+  const st = Object.assign({ kid: '', calPts: 9, cptMin: 3, cptMode: 'tap', cptPair: 0, pairSec: 5, pairCats: ['face', 'move', 'color', 'moji', 'kira', 'many'], viewSec: 20, sound: true, debug: false }, (() => { try { return JSON.parse(localStorage.getItem(ST_KEY) || '{}'); } catch (e) { return {}; } })());
   const saveSt = () => { try { localStorage.setItem(ST_KEY, JSON.stringify(st)); } catch (e) { /* 無視 */ } };
 
   /* ============================================================
@@ -675,7 +676,8 @@ function jaSay(t) {
     const pv = h('div', { class: 'pv' }, pvSt);
     const loading = h('div', { class: 'loading' }, h('div', null, h('span', { class: 'emo' }, '📷'), h('span', { class: 'lt' }, 'カメラを ひらいています…')));
     const dbg = h('div', { class: 'dbg' });
-    const stage = h('div', { class: 'stage' }, cv, center, pv, quit, dbg, loading);
+    const warn = h('div', { class: 'fwarn', hidden: true });
+    const stage = h('div', { class: 'stage' }, cv, center, pv, warn, quit, dbg, loading);
     main.appendChild(h('section', { class: 'screen' }, stage));
     let qt = null; const qc = () => { clearTimeout(qt); quit.classList.remove('pressing'); };
     quit.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); quit.classList.add('pressing'); qt = setTimeout(() => { qc(); (opt.onQuit || (() => go(renderHome)))(); }, 1500); });
@@ -685,7 +687,7 @@ function jaSay(t) {
     catch (e) { const m = String(e && (e.name + ' ' + e.message) || e); fail(/NotAllowed|Permission|Security/i.test(m) ? 'カメラを つかう ことが ゆるされていません。' : /nocam/.test(m) ? 'この 画面では カメラが つかえません。' : 'カメラを ひらけませんでした。', /NotAllowed|Permission/i.test(m) ? 'iPad の「設定」→「アプリ」→「Safari」→「カメラ」を「確認」か「許可」に して、ひらきなおしてください。' : m); return null; }
     if (!stage.isConnected) return null;
     video.className = 'shown'; pv.insertBefore(video, pv.firstChild); video.play().catch(() => {});
-    pv.hidden = !st.preview && !opt.showPv;
+    pv.hidden = !opt.showPv;
     const tick = setInterval(() => { const el = loading.querySelector('.lt'); if (el) el.textContent = '顔の 読みとりを じゅんび ちゅう：' + (V.step || '…'); }, 300);
     try { await timeout(loadVision(), 120000, 'visiontimeout'); } catch (e) { clearInterval(tick); fail('読みとりの じゅんびが できませんでした。', (V.step || '') + ' / ' + (e && e.message)); return null; }
     clearInterval(tick);
@@ -693,7 +695,8 @@ function jaSay(t) {
     loading.hidden = true; keepAwake();
     const g = cv.getContext('2d');
     const fit = () => { const d = Math.min(2, window.devicePixelRatio || 1), r = stage.getBoundingClientRect(); const W = Math.round(r.width), H = Math.round(r.height); if (cv.width !== W * d || cv.height !== H * d) { cv.width = W * d; cv.height = H * d; } g.setTransform(d, 0, 0, d, 0, 0); return { W, H }; };
-    const setPv = (txt, ok) => { pvSt.textContent = txt; pvSt.style.background = ok ? 'rgba(47,158,68,.8)' : 'rgba(224,49,49,.8)'; };
+    // 小窓が ない ときは、顔が 見えない ときだけ 上に 小さく 知らせる
+    const setPv = (txt, ok) => { pvSt.textContent = txt; pvSt.style.background = ok ? 'rgba(47,158,68,.8)' : 'rgba(224,49,49,.8)'; if (warn.hidden !== (ok || !pv.hidden)) warn.hidden = ok || !pv.hidden; if (!warn.hidden && warn.textContent !== txt) warn.textContent = txt; };
     return { stage, cv, g, center, pv, setPv, fit, dbg, quit };
   }
   // 顔の じょうたいの ことば
@@ -752,7 +755,7 @@ function jaSay(t) {
       }
     });
     function begin() {
-      A(); S.center.innerHTML = ''; S.pv.style.cssText = ''; S.pv.hidden = !st.preview;
+      A(); S.center.innerHTML = ''; S.pv.style.cssText = ''; S.pv.hidden = true;   // 小窓は 右下の 点に かぶるので かくす
       seq = shuffle(calPoints(n)); k = 0; phase = 'pts'; t0 = performance.now(); SND.soft();
       say('ひよこを みてね');
       draw();
@@ -1329,7 +1332,6 @@ function jaSay(t) {
       const seg = (label, key, opts, help) => h('div', { class: 'row' }, h('b', { style: 'min-width:150px' }, label), h('div', { class: 'seg' }, opts.map(([v, t]) => h('button', { type: 'button', class: st[key] === v ? 'on' : '', onclick: () => { st[key] = v; saveSt(); renderMenu(); } }, t))), help ? h('small', { class: 'help' }, help) : null);
       b.append(
         seg('見る ばしょ あわせ', 'calPts', [[9, '9点（ていねい）'], [5, '5点'], [3, '3点（左右だけ）']], '「きょうざいを みる」は 5点 いじょうが ひつよう。じっと 見るのが むずかしい 子は 少ない 点で。'),
-        seg('カメラの 小窓', 'preview', [[true, 'だす'], [false, 'ださない']], '課題中、右下に カメラの 映像と「よい いち」かどうかを 出す（子どもが 気に なる ときは「ださない」）'),
         seg('音・こえ', 'sound', [[true, 'だす'], [false, 'ださない']]),
         seg('しらべる 表示', 'debug', [[false, 'ださない'], [true, 'だす']], '先生用：視線の 点・fps を 画面に 出す'),
         h('p', { class: 'help' }, '© 2026 MieeL　学校や家庭での利用は自由です（無断転載・再配布・販売はお断り）。くわしくは「📜 ライセンス」'));

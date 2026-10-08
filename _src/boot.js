@@ -44,7 +44,6 @@
       const seg = (label, key, opts, help) => h('div', { class: 'row' }, h('b', { style: 'min-width:150px' }, label), h('div', { class: 'seg' }, opts.map(([v, t]) => h('button', { type: 'button', class: st[key] === v ? 'on' : '', onclick: () => { st[key] = v; saveSt(); renderMenu(); } }, t))), help ? h('small', { class: 'help' }, help) : null);
       b.append(
         seg('見る ばしょ あわせ', 'calPts', [[9, '9点（ていねい）'], [5, '5点'], [3, '3点（左右だけ）']], '「きょうざいを みる」は 5点 いじょうが ひつよう。じっと 見るのが むずかしい 子は 少ない 点で。'),
-        seg('カメラの 小窓', 'preview', [[true, 'だす'], [false, 'ださない']], '課題中、右下に カメラの 映像と「よい いち」かどうかを 出す（子どもが 気に なる ときは「ださない」）'),
         seg('音・こえ', 'sound', [[true, 'だす'], [false, 'ださない']]),
         seg('しらべる 表示', 'debug', [[false, 'ださない'], [true, 'だす']], '先生用：視線の 点・fps を 画面に 出す'),
         h('p', { class: 'help' }, '© 2026 MieeL　学校や家庭での利用は自由です（無断転載・再配布・販売はお断り）。くわしくは「📜 ライセンス」'));

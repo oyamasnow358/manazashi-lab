@@ -24,7 +24,7 @@
      せってい
      ============================================================ */
   const ST_KEY = 'mieel-manazashi-st';
-  const st = Object.assign({ kid: '', calPts: 9, cptMin: 3, cptMode: 'tap', cptPair: 0, pairSec: 5, pairCats: ['face', 'move', 'color', 'moji', 'kira', 'many'], viewSec: 20, sound: true, debug: false, preview: true }, (() => { try { return JSON.parse(localStorage.getItem(ST_KEY) || '{}'); } catch (e) { return {}; } })());
+  const st = Object.assign({ kid: '', calPts: 9, cptMin: 3, cptMode: 'tap', cptPair: 0, pairSec: 5, pairCats: ['face', 'move', 'color', 'moji', 'kira', 'many'], viewSec: 20, sound: true, debug: false }, (() => { try { return JSON.parse(localStorage.getItem(ST_KEY) || '{}'); } catch (e) { return {}; } })());
   const saveSt = () => { try { localStorage.setItem(ST_KEY, JSON.stringify(st)); } catch (e) { /* 無視 */ } };
 
   /* ============================================================
@@ -171,7 +171,8 @@
     const pv = h('div', { class: 'pv' }, pvSt);
     const loading = h('div', { class: 'loading' }, h('div', null, h('span', { class: 'emo' }, '📷'), h('span', { class: 'lt' }, 'カメラを ひらいています…')));
     const dbg = h('div', { class: 'dbg' });
-    const stage = h('div', { class: 'stage' }, cv, center, pv, quit, dbg, loading);
+    const warn = h('div', { class: 'fwarn', hidden: true });
+    const stage = h('div', { class: 'stage' }, cv, center, pv, warn, quit, dbg, loading);
     main.appendChild(h('section', { class: 'screen' }, stage));
     let qt = null; const qc = () => { clearTimeout(qt); quit.classList.remove('pressing'); };
     quit.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); quit.classList.add('pressing'); qt = setTimeout(() => { qc(); (opt.onQuit || (() => go(renderHome)))(); }, 1500); });
@@ -181,7 +182,7 @@
     catch (e) { const m = String(e && (e.name + ' ' + e.message) || e); fail(/NotAllowed|Permission|Security/i.test(m) ? 'カメラを つかう ことが ゆるされていません。' : /nocam/.test(m) ? 'この 画面では カメラが つかえません。' : 'カメラを ひらけませんでした。', /NotAllowed|Permission/i.test(m) ? 'iPad の「設定」→「アプリ」→「Safari」→「カメラ」を「確認」か「許可」に して、ひらきなおしてください。' : m); return null; }
     if (!stage.isConnected) return null;
     video.className = 'shown'; pv.insertBefore(video, pv.firstChild); video.play().catch(() => {});
-    pv.hidden = !st.preview && !opt.showPv;
+    pv.hidden = !opt.showPv;
     const tick = setInterval(() => { const el = loading.querySelector('.lt'); if (el) el.textContent = '顔の 読みとりを じゅんび ちゅう：' + (V.step || '…'); }, 300);
     try { await timeout(loadVision(), 120000, 'visiontimeout'); } catch (e) { clearInterval(tick); fail('読みとりの じゅんびが できませんでした。', (V.step || '') + ' / ' + (e && e.message)); return null; }
     clearInterval(tick);
@@ -189,7 +190,8 @@
     loading.hidden = true; keepAwake();
     const g = cv.getContext('2d');
     const fit = () => { const d = Math.min(2, window.devicePixelRatio || 1), r = stage.getBoundingClientRect(); const W = Math.round(r.width), H = Math.round(r.height); if (cv.width !== W * d || cv.height !== H * d) { cv.width = W * d; cv.height = H * d; } g.setTransform(d, 0, 0, d, 0, 0); return { W, H }; };
-    const setPv = (txt, ok) => { pvSt.textContent = txt; pvSt.style.background = ok ? 'rgba(47,158,68,.8)' : 'rgba(224,49,49,.8)'; };
+    // 小窓が ない ときは、顔が 見えない ときだけ 上に 小さく 知らせる
+    const setPv = (txt, ok) => { pvSt.textContent = txt; pvSt.style.background = ok ? 'rgba(47,158,68,.8)' : 'rgba(224,49,49,.8)'; if (warn.hidden !== (ok || !pv.hidden)) warn.hidden = ok || !pv.hidden; if (!warn.hidden && warn.textContent !== txt) warn.textContent = txt; };
     return { stage, cv, g, center, pv, setPv, fit, dbg, quit };
   }
   // 顔の じょうたいの ことば

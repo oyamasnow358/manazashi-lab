@@ -30,7 +30,7 @@
       }
     });
     function begin() {
-      A(); S.center.innerHTML = ''; S.pv.style.cssText = ''; S.pv.hidden = !st.preview;
+      A(); S.center.innerHTML = ''; S.pv.style.cssText = ''; S.pv.hidden = true;   // 小窓は 右下の 点に かぶるので かくす
       seq = shuffle(calPoints(n)); k = 0; phase = 'pts'; t0 = performance.now(); SND.soft();
       say('ひよこを みてね');
       draw();
