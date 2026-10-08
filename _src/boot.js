@@ -136,4 +136,4 @@
     go(renderHome);
     setTimeout(() => loadVision().catch(() => {}), 1500);
   })();
-  window.__ml = { V, st, DB, CAL, get kids() { return KIDS; }, metricsOf, go, renderSession, renderReport };
+  window.__ml = { pupil, EYEPOLY, V, st, DB, CAL, get kids() { return KIDS; }, metricsOf, go, renderSession, renderReport };

@@ -73,8 +73,21 @@
     b: f => [1, f.ix, f.ic, f.yaw / 30, f.pitch / 30],
     c: f => [1, f.ix, f.ic, f.iy, f.open, f.yaw / 30, f.pitch / 30],
     d: f => [1, f.ixr, f.ixl, f.icr, f.icl, f.yaw / 30, f.pitch / 30],
-    e: f => [1, f.ix, f.ic, f.open, f.yaw / 30, f.pitch / 30, f.hz ? f.hx / Math.abs(f.hz) : 0, f.hz ? f.hy / Math.abs(f.hz) : 0]
+    e: f => [1, f.ix, f.ic, f.open, f.yaw / 30, f.pitch / 30, f.hz ? f.hx / Math.abs(f.hz) : 0, f.hz ? f.hy / Math.abs(f.hz) : 0],
+    o3: f => [1, f.ixr, f.ixl, f.open, f.pitch / 30],
+    o4: f => [1, f.ix, f.open, f.pitch / 30, f.yaw / 30],
+    p5: f => [1, f.ix, f.open, f.ix * f.open, f.pitch / 30],
+    // 映像から 自分で もとめた 黒目の 中心（pu・pv）を つかう もの
+    q1: f => [1, f.pu, f.pv],
+    q2: f => [1, f.pu, f.pv, f.open],
+    q3: f => [1, f.pur, f.pul, f.pvr, f.pvl, f.open],
+    q4: f => [1, f.pu, f.pv, f.open, f.ix, f.ic],
+    q5: f => [1, f.pu, f.pv, f.open, f.pitch / 30],
+    x5: f => [1, f.pu],
+    x6: f => [1, f.pur, f.pul],
+    x7: f => [1, f.pu, f.ix]
   };
+  const XY_SETS = ['a', 'b', 'c', 'd', 'e', 'o3', 'o4', 'p5', 'q1', 'q2', 'q3', 'q4', 'q5'], X_SETS = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7'];
   function gazeVec(f, mode, set) {
     if (set && SETS[set]) return SETS[set](f);
     // むかしの 形式（あとかたの ため）
@@ -117,13 +130,15 @@
     return { mode: mode || 'xy', set, lam, mu, sg, wx, wy, made: Date.now() };
   }
   // いくつかの 計算方法を ためし、「1点ずつ はずして 当てる」テストで いちばん 当たる ものを えらぶ
-  function fitCalib(samples, mode) {
+  function fitCalib(samples, mode, opt) {
     const byPt = {};
     samples.filter(s => s.f && !s.f.blink).forEach(s => { const k = s.tx + ',' + s.ty; (byPt[k] = byPt[k] || []).push(s); });
     const groups = Object.values(byPt).map(trimPoint).filter(g => g.length >= 3);
     const S = [].concat.apply([], groups);
     if (S.length < 8 || groups.length < 3) return null;
-    const sets = mode === 'x' ? ['x1', 'x2', 'x3', 'x4'] : ['a', 'b', 'c', 'd', 'e'];
+    // 数が ない（むかしの データ・黒目が 見つからない）組みあわせは はぶく
+    const sets = ((opt && opt.sets) || (mode === 'x' ? X_SETS : XY_SETS)).filter(k => S.every(sm => SETS[k](sm.f).every(v => typeof v === 'number' && isFinite(v))));
+    if (!sets.length) return null;
     let best = null;
     sets.forEach(set => [0.3, 1, 3].forEach(lam => {
       if (SETS[set](S[0].f).length > groups.length + 1) return;   // 点の 数より 多い 項目は つかわない（覚えすぎ）
@@ -157,11 +172,13 @@
       const ps = g.map(s => predict(cal, s.f)).filter(Boolean);
       if (!ps.length) return;
       const px = median(ps.map(p => p.x)), py = median(ps.map(p => p.y));
-      errs.push(cal.mode === 'x' ? Math.abs(px - g[0].tx) : Math.hypot(px - g[0].tx, py - g[0].ty));
+      errs.push({ d: cal.mode === 'x' ? Math.abs(px - g[0].tx) : Math.hypot(px - g[0].tx, py - g[0].ty), x: Math.abs(px - g[0].tx), y: Math.abs(py - g[0].ty) });
     });
-    const e = errs.length ? mean(errs) : 1;
+    const e = errs.length ? mean(errs.map(x => x.d)) : 1, ex = errs.length ? mean(errs.map(x => x.x)) : 1, ey = cal.mode === 'x' ? null : (errs.length ? mean(errs.map(x => x.y)) : 1);
     const grade = cal.mode === 'x' ? (e < 0.12 ? 'good' : e < 0.2 ? 'ok' : 'poor') : (e < 0.11 ? 'good' : e < 0.19 ? 'ok' : 'poor');
-    return { err: e, grade, points: errs.length };
+    // 左右だけでも つかえるか（どっちを みる？ は 左右だけ）
+    const gradeX = ex < 0.12 ? 'good' : ex < 0.2 ? 'ok' : 'poor';
+    return { err: e, ex, ey, grade, gradeX, points: errs.length };
   }
 
   /* ---------- 視線の なめらか ---------- */

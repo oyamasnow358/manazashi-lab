@@ -240,8 +240,21 @@
     b: f => [1, f.ix, f.ic, f.yaw / 30, f.pitch / 30],
     c: f => [1, f.ix, f.ic, f.iy, f.open, f.yaw / 30, f.pitch / 30],
     d: f => [1, f.ixr, f.ixl, f.icr, f.icl, f.yaw / 30, f.pitch / 30],
-    e: f => [1, f.ix, f.ic, f.open, f.yaw / 30, f.pitch / 30, f.hz ? f.hx / Math.abs(f.hz) : 0, f.hz ? f.hy / Math.abs(f.hz) : 0]
+    e: f => [1, f.ix, f.ic, f.open, f.yaw / 30, f.pitch / 30, f.hz ? f.hx / Math.abs(f.hz) : 0, f.hz ? f.hy / Math.abs(f.hz) : 0],
+    o3: f => [1, f.ixr, f.ixl, f.open, f.pitch / 30],
+    o4: f => [1, f.ix, f.open, f.pitch / 30, f.yaw / 30],
+    p5: f => [1, f.ix, f.open, f.ix * f.open, f.pitch / 30],
+    // 映像から 自分で もとめた 黒目の 中心（pu・pv）を つかう もの
+    q1: f => [1, f.pu, f.pv],
+    q2: f => [1, f.pu, f.pv, f.open],
+    q3: f => [1, f.pur, f.pul, f.pvr, f.pvl, f.open],
+    q4: f => [1, f.pu, f.pv, f.open, f.ix, f.ic],
+    q5: f => [1, f.pu, f.pv, f.open, f.pitch / 30],
+    x5: f => [1, f.pu],
+    x6: f => [1, f.pur, f.pul],
+    x7: f => [1, f.pu, f.ix]
   };
+  const XY_SETS = ['a', 'b', 'c', 'd', 'e', 'o3', 'o4', 'p5', 'q1', 'q2', 'q3', 'q4', 'q5'], X_SETS = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7'];
   function gazeVec(f, mode, set) {
     if (set && SETS[set]) return SETS[set](f);
     // むかしの 形式（あとかたの ため）
@@ -284,13 +297,15 @@
     return { mode: mode || 'xy', set, lam, mu, sg, wx, wy, made: Date.now() };
   }
   // いくつかの 計算方法を ためし、「1点ずつ はずして 当てる」テストで いちばん 当たる ものを えらぶ
-  function fitCalib(samples, mode) {
+  function fitCalib(samples, mode, opt) {
     const byPt = {};
     samples.filter(s => s.f && !s.f.blink).forEach(s => { const k = s.tx + ',' + s.ty; (byPt[k] = byPt[k] || []).push(s); });
     const groups = Object.values(byPt).map(trimPoint).filter(g => g.length >= 3);
     const S = [].concat.apply([], groups);
     if (S.length < 8 || groups.length < 3) return null;
-    const sets = mode === 'x' ? ['x1', 'x2', 'x3', 'x4'] : ['a', 'b', 'c', 'd', 'e'];
+    // 数が ない（むかしの データ・黒目が 見つからない）組みあわせは はぶく
+    const sets = ((opt && opt.sets) || (mode === 'x' ? X_SETS : XY_SETS)).filter(k => S.every(sm => SETS[k](sm.f).every(v => typeof v === 'number' && isFinite(v))));
+    if (!sets.length) return null;
     let best = null;
     sets.forEach(set => [0.3, 1, 3].forEach(lam => {
       if (SETS[set](S[0].f).length > groups.length + 1) return;   // 点の 数より 多い 項目は つかわない（覚えすぎ）
@@ -324,11 +339,13 @@
       const ps = g.map(s => predict(cal, s.f)).filter(Boolean);
       if (!ps.length) return;
       const px = median(ps.map(p => p.x)), py = median(ps.map(p => p.y));
-      errs.push(cal.mode === 'x' ? Math.abs(px - g[0].tx) : Math.hypot(px - g[0].tx, py - g[0].ty));
+      errs.push({ d: cal.mode === 'x' ? Math.abs(px - g[0].tx) : Math.hypot(px - g[0].tx, py - g[0].ty), x: Math.abs(px - g[0].tx), y: Math.abs(py - g[0].ty) });
     });
-    const e = errs.length ? mean(errs) : 1;
+    const e = errs.length ? mean(errs.map(x => x.d)) : 1, ex = errs.length ? mean(errs.map(x => x.x)) : 1, ey = cal.mode === 'x' ? null : (errs.length ? mean(errs.map(x => x.y)) : 1);
     const grade = cal.mode === 'x' ? (e < 0.12 ? 'good' : e < 0.2 ? 'ok' : 'poor') : (e < 0.11 ? 'good' : e < 0.19 ? 'ok' : 'poor');
-    return { err: e, grade, points: errs.length };
+    // 左右だけでも つかえるか（どっちを みる？ は 左右だけ）
+    const gradeX = ex < 0.12 ? 'good' : ex < 0.2 ? 'ok' : 'poor';
+    return { err: e, ex, ey, grade, gradeX, points: errs.length };
   }
 
   /* ---------- 視線の なめらか ---------- */
@@ -571,6 +588,45 @@ function jaSay(t) {
     await timeout(video.play(), 5000, 'play').catch(() => {});
   }
   function stopCam() { V.running = false; V.onFrame = null; if (V.stream) { V.stream.getTracks().forEach(t => t.stop()); V.stream = null; } video.srcObject = null; video.className = ''; document.body.appendChild(video); releaseWake(); }
+  /* ---------- 映像から 黒目の 中心を もとめる ----------
+     MediaPipe の 黒目の 点は まんなかに よりがちで 動きが 小さく 出るので、
+     目の ところだけ 切りだして「暗い ところの 重心」を 自分でも 計算する */
+  const EYEPOLY = { r: [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246], l: [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398] };
+  const EW = 96, EH = 48, EC = document.createElement('canvas'); EC.width = EW; EC.height = EH;
+  const ecx = EC.getContext('2d', { willReadFrequently: true });
+  function pupil(lm, VW, VH, inner, outer, poly, src) {
+    const P = i => [lm[i].x * VW, lm[i].y * VH];
+    const a = P(inner), b = P(outer), ex = [b[0] - a[0], b[1] - a[1]], L = Math.hypot(ex[0], ex[1]);
+    if (L < 12) return null;
+    const ux = [ex[0] / L, ex[1] / L], uy = [-ux[1], ux[0]], sc = EW / (1.3 * L);
+    // 目の 線を よこに した 座標へ（u：目がしら -0.15 〜 目じり 1.15、v：-0.35 〜 0.35）
+    const o = [a[0] - 0.15 * ex[0] - 0.35 * L * uy[0], a[1] - 0.15 * ex[1] - 0.35 * L * uy[1]];
+    const tf = q => [((q[0] - o[0]) * ux[0] + (q[1] - o[1]) * ux[1]) * sc, ((q[0] - o[0]) * uy[0] + (q[1] - o[1]) * uy[1]) * sc];
+    ecx.setTransform(ux[0] * sc, uy[0] * sc, ux[1] * sc, uy[1] * sc, -(o[0] * ux[0] + o[1] * ux[1]) * sc, -(o[0] * uy[0] + o[1] * uy[1]) * sc);
+    ecx.drawImage(src || video, 0, 0);
+    ecx.setTransform(1, 0, 0, 1, 0, 0);
+    // まぶたの ふちの 影・まつげを さけるため、目の かたちを すこし 小さく する
+    let pg = poly.map(i => tf(P(i)));
+    const cx = pg.reduce((s, q) => s + q[0], 0) / pg.length, cy = pg.reduce((s, q) => s + q[1], 0) / pg.length;
+    pg = pg.map(q => [cx + (q[0] - cx) * 0.92, cy + (q[1] - cy) * 0.75]);
+    const inside = (x, y) => { let c = false; for (let i = 0, j = pg.length - 1; i < pg.length; j = i++) { const xi = pg[i][0], yi = pg[i][1], xj = pg[j][0], yj = pg[j][1]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+    const d = ecx.getImageData(0, 0, EW, EH).data, px = [];
+    for (let y = 0; y < EH; y++) for (let x = 0; x < EW; x++) if (inside(x + 0.5, y + 0.5)) { const k = (y * EW + x) * 4; px.push([x + 0.5, y + 0.5, 0.3 * d[k] + 0.59 * d[k + 1] + 0.11 * d[k + 2]]); }
+    if (px.length < 30) return null;
+    const vs = px.map(q => q[2]).sort((m, n) => m - n), thr = vs[Math.floor(vs.length * 0.3)], lo = vs[Math.floor(vs.length * 0.02)];
+    let sw = 0, sx = 0, sy = 0;
+    px.forEach(q => { if (q[2] < thr) { const w = (thr - q[2]) / Math.max(1, thr - lo); sw += w; sx += q[0] * w; sy += q[1] * w; } });
+    if (sw < 1) return null;
+    return { u: sx / sw / sc / L - 0.15, v: sy / sw / sc / L - 0.35, c: (vs[Math.floor(vs.length * 0.9)] - lo) };
+  }
+  function addPupil(f, lm) {
+    try {
+      const VW = video.videoWidth, VH = video.videoHeight;
+      const r = pupil(lm, VW, VH, 133, 33, EYEPOLY.r), l = pupil(lm, VW, VH, 362, 263, EYEPOLY.l);
+      if (r && l) { f.pur = r.u; f.pul = l.u; f.pvr = r.v; f.pvl = l.v; f.pu = (r.u + (1 - l.u)) / 2 - 0.5; f.pv = (r.v + l.v) / 2; f.pc = Math.min(r.c, l.c); }
+    } catch (e) { /* 無視 */ }
+    return f;
+  }
   // 毎コマ：顔の 特徴 f（なければ null）を わたす
   function runFace(onFrame) {
     V.onFrame = onFrame;
@@ -586,6 +642,7 @@ function jaSay(t) {
       try {
         const r = V.face.detectForVideo(video, t);
         if (r.faceLandmarks && r.faceLandmarks[0]) f = ML.faceFeatures(r.faceLandmarks[0], video.videoWidth, video.videoHeight, r.facialTransformationMatrixes && r.facialTransformationMatrixes[0] && r.facialTransformationMatrixes[0].data, r.faceBlendshapes && r.faceBlendshapes[0] && r.faceBlendshapes[0].categories);
+        if (f) addPupil(f, r.faceLandmarks[0]);
       } catch (e) { console.warn(e); }
       if (V.onFrame) V.onFrame(f, t);
     };
@@ -723,13 +780,15 @@ function jaSay(t) {
     }
     function finish() {
       cancelAnimationFrame(raf); phase = 'done'; V.onFrame = null;
-      const cal = ML.fitCalib(samples, mode);
-      const q = cal ? ML.validate(cal, vals) : { err: 1, grade: 'poor', points: 0 };
+      // 9点で 計算 → のこりの 点で たしかめ → さいごは ぜんぶの 点で 計算しなおす（点が ふえるほど よい）
+      const cal0 = ML.fitCalib(samples, mode);
+      const q = cal0 ? ML.validate(cal0, vals) : { err: 1, ex: 1, ey: 1, grade: 'poor', gradeX: 'poor', points: 0 };
+      const cal = cal0 ? (ML.fitCalib(samples.concat(vals), mode, { sets: [cal0.set] }) || cal0) : null;
       const { W, H } = S.fit(); S.g.clearRect(0, 0, W, H);
       const GR = { good: ['✅ よい', '3×3 の ばしょ・ヒートマップまで つかえます'], ok: ['🟡 ふつう', '左右・上下（4つ くらいの ばしょ）の くらべに つかえます'], poor: ['🔴 あらい', '顔の 向きだけを つかいます（視線の ばしょは あてに しない）'] }[q.grade];
       S.center.style.cssText = '';
       S.center.innerHTML = '';
-      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：画面の はばの やく ' + Math.round(q.err * 100) + '%（' + (mode === 'x' ? '左右だけ' : '左右・上下') + '）' + (cal ? '' : '　※ 目の 記録が たりませんでした') + (st.debug && cal ? '　[' + cal.set + ' λ' + cal.lam + ' cv' + Math.round(cal.cvErr * 100) + '%]' : '')),
+      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：左右 やく ' + Math.round(q.ex * 100) + '%' + (q.ey != null ? '・上下 やく ' + Math.round(q.ey * 100) + '%' : '') + '（画面の 大きさに たいして）' + (q.grade === 'poor' && q.gradeX !== 'poor' ? '　→ 左右だけなら「' + { good: 'よい', ok: 'ふつう' }[q.gradeX] + '」（どっちを みる？ に つかえます）' : '') + (cal ? '' : '　※ 目の 記録が たりませんでした') + (st.debug && cal ? '　[' + cal.set + ' λ' + cal.lam + ' cv' + Math.round(cal.cvErr * 100) + '%]' : '')),
         h('div', { class: 'row', style: 'justify-content:center' },
           cal ? h('button', { class: 'pill', type: 'button', onclick: () => tryGaze(cal) }, '👁 ためしに 見る') : null,
           h('button', { class: 'pill', type: 'button', onclick: () => exportCalib(samples, vals, cal, q) }, '📤 しらべる データ')),
@@ -758,7 +817,7 @@ function jaSay(t) {
   }
   // 調整の ための データ（顔の 点から 計算した 数字だけ。映像は ふくまない）
   function exportCalib(samples, vals, cal, q) {
-    const pick = s => { const f = s.f; return { tx: s.tx, ty: s.ty, f: { ix: r3(f.ix), ixr: r3(f.ixr), ixl: r3(f.ixl), iy: r3(f.iy), ic: r3(f.ic), icr: r3(f.icr), icl: r3(f.icl), open: r3(f.open), yaw: r1(f.yaw), pitch: r1(f.pitch), roll: r1(f.roll), hx: r1(f.hx), hy: r1(f.hy), hz: r1(f.hz), eyeW: r3(f.eyeW), blink: f.blink } }; };
+    const pick = s => { const f = s.f; return { tx: s.tx, ty: s.ty, f: { ix: r3(f.ix), ixr: r3(f.ixr), ixl: r3(f.ixl), iy: r3(f.iy), ic: r3(f.ic), icr: r3(f.icr), icl: r3(f.icl), open: r3(f.open), yaw: r1(f.yaw), pitch: r1(f.pitch), roll: r1(f.roll), hx: r1(f.hx), hy: r1(f.hy), hz: r1(f.hz), eyeW: r3(f.eyeW), blink: f.blink, pu: f.pu == null ? null : r3(f.pu), pv: f.pv == null ? null : r3(f.pv), pur: f.pur == null ? null : r3(f.pur), pul: f.pul == null ? null : r3(f.pul), pvr: f.pvr == null ? null : r3(f.pvr), pvl: f.pvl == null ? null : r3(f.pvl), pc: f.pc == null ? null : Math.round(f.pc) } }; };
     const data = { format: 'mieel-manazashi-calib', at: new Date().toISOString(), ua: navigator.userAgent, screen: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio }, video: { w: video.videoWidth, h: video.videoHeight }, quality: q, set: cal && cal.set, samples: samples.map(pick), vals: vals.map(pick) };
     download('まなざしラボ_しらべるデータ_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '') + '.json', JSON.stringify(data), 'application/json');
   }
@@ -1362,7 +1421,7 @@ function jaSay(t) {
     go(renderHome);
     setTimeout(() => loadVision().catch(() => {}), 1500);
   })();
-  window.__ml = { V, st, DB, CAL, get kids() { return KIDS; }, metricsOf, go, renderSession, renderReport };
+  window.__ml = { pupil, EYEPOLY, V, st, DB, CAL, get kids() { return KIDS; }, metricsOf, go, renderSession, renderReport };
 
 })();
 </script>

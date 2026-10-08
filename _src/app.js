@@ -84,6 +84,45 @@
     await timeout(video.play(), 5000, 'play').catch(() => {});
   }
   function stopCam() { V.running = false; V.onFrame = null; if (V.stream) { V.stream.getTracks().forEach(t => t.stop()); V.stream = null; } video.srcObject = null; video.className = ''; document.body.appendChild(video); releaseWake(); }
+  /* ---------- 映像から 黒目の 中心を もとめる ----------
+     MediaPipe の 黒目の 点は まんなかに よりがちで 動きが 小さく 出るので、
+     目の ところだけ 切りだして「暗い ところの 重心」を 自分でも 計算する */
+  const EYEPOLY = { r: [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246], l: [362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387, 386, 385, 384, 398] };
+  const EW = 96, EH = 48, EC = document.createElement('canvas'); EC.width = EW; EC.height = EH;
+  const ecx = EC.getContext('2d', { willReadFrequently: true });
+  function pupil(lm, VW, VH, inner, outer, poly, src) {
+    const P = i => [lm[i].x * VW, lm[i].y * VH];
+    const a = P(inner), b = P(outer), ex = [b[0] - a[0], b[1] - a[1]], L = Math.hypot(ex[0], ex[1]);
+    if (L < 12) return null;
+    const ux = [ex[0] / L, ex[1] / L], uy = [-ux[1], ux[0]], sc = EW / (1.3 * L);
+    // 目の 線を よこに した 座標へ（u：目がしら -0.15 〜 目じり 1.15、v：-0.35 〜 0.35）
+    const o = [a[0] - 0.15 * ex[0] - 0.35 * L * uy[0], a[1] - 0.15 * ex[1] - 0.35 * L * uy[1]];
+    const tf = q => [((q[0] - o[0]) * ux[0] + (q[1] - o[1]) * ux[1]) * sc, ((q[0] - o[0]) * uy[0] + (q[1] - o[1]) * uy[1]) * sc];
+    ecx.setTransform(ux[0] * sc, uy[0] * sc, ux[1] * sc, uy[1] * sc, -(o[0] * ux[0] + o[1] * ux[1]) * sc, -(o[0] * uy[0] + o[1] * uy[1]) * sc);
+    ecx.drawImage(src || video, 0, 0);
+    ecx.setTransform(1, 0, 0, 1, 0, 0);
+    // まぶたの ふちの 影・まつげを さけるため、目の かたちを すこし 小さく する
+    let pg = poly.map(i => tf(P(i)));
+    const cx = pg.reduce((s, q) => s + q[0], 0) / pg.length, cy = pg.reduce((s, q) => s + q[1], 0) / pg.length;
+    pg = pg.map(q => [cx + (q[0] - cx) * 0.92, cy + (q[1] - cy) * 0.75]);
+    const inside = (x, y) => { let c = false; for (let i = 0, j = pg.length - 1; i < pg.length; j = i++) { const xi = pg[i][0], yi = pg[i][1], xj = pg[j][0], yj = pg[j][1]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; };
+    const d = ecx.getImageData(0, 0, EW, EH).data, px = [];
+    for (let y = 0; y < EH; y++) for (let x = 0; x < EW; x++) if (inside(x + 0.5, y + 0.5)) { const k = (y * EW + x) * 4; px.push([x + 0.5, y + 0.5, 0.3 * d[k] + 0.59 * d[k + 1] + 0.11 * d[k + 2]]); }
+    if (px.length < 30) return null;
+    const vs = px.map(q => q[2]).sort((m, n) => m - n), thr = vs[Math.floor(vs.length * 0.3)], lo = vs[Math.floor(vs.length * 0.02)];
+    let sw = 0, sx = 0, sy = 0;
+    px.forEach(q => { if (q[2] < thr) { const w = (thr - q[2]) / Math.max(1, thr - lo); sw += w; sx += q[0] * w; sy += q[1] * w; } });
+    if (sw < 1) return null;
+    return { u: sx / sw / sc / L - 0.15, v: sy / sw / sc / L - 0.35, c: (vs[Math.floor(vs.length * 0.9)] - lo) };
+  }
+  function addPupil(f, lm) {
+    try {
+      const VW = video.videoWidth, VH = video.videoHeight;
+      const r = pupil(lm, VW, VH, 133, 33, EYEPOLY.r), l = pupil(lm, VW, VH, 362, 263, EYEPOLY.l);
+      if (r && l) { f.pur = r.u; f.pul = l.u; f.pvr = r.v; f.pvl = l.v; f.pu = (r.u + (1 - l.u)) / 2 - 0.5; f.pv = (r.v + l.v) / 2; f.pc = Math.min(r.c, l.c); }
+    } catch (e) { /* 無視 */ }
+    return f;
+  }
   // 毎コマ：顔の 特徴 f（なければ null）を わたす
   function runFace(onFrame) {
     V.onFrame = onFrame;
@@ -99,6 +138,7 @@
       try {
         const r = V.face.detectForVideo(video, t);
         if (r.faceLandmarks && r.faceLandmarks[0]) f = ML.faceFeatures(r.faceLandmarks[0], video.videoWidth, video.videoHeight, r.facialTransformationMatrixes && r.facialTransformationMatrixes[0] && r.facialTransformationMatrixes[0].data, r.faceBlendshapes && r.faceBlendshapes[0] && r.faceBlendshapes[0].categories);
+        if (f) addPupil(f, r.faceLandmarks[0]);
       } catch (e) { console.warn(e); }
       if (V.onFrame) V.onFrame(f, t);
     };

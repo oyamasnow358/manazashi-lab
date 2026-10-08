@@ -58,13 +58,15 @@
     }
     function finish() {
       cancelAnimationFrame(raf); phase = 'done'; V.onFrame = null;
-      const cal = ML.fitCalib(samples, mode);
-      const q = cal ? ML.validate(cal, vals) : { err: 1, grade: 'poor', points: 0 };
+      // 9点で 計算 → のこりの 点で たしかめ → さいごは ぜんぶの 点で 計算しなおす（点が ふえるほど よい）
+      const cal0 = ML.fitCalib(samples, mode);
+      const q = cal0 ? ML.validate(cal0, vals) : { err: 1, ex: 1, ey: 1, grade: 'poor', gradeX: 'poor', points: 0 };
+      const cal = cal0 ? (ML.fitCalib(samples.concat(vals), mode, { sets: [cal0.set] }) || cal0) : null;
       const { W, H } = S.fit(); S.g.clearRect(0, 0, W, H);
       const GR = { good: ['✅ よい', '3×3 の ばしょ・ヒートマップまで つかえます'], ok: ['🟡 ふつう', '左右・上下（4つ くらいの ばしょ）の くらべに つかえます'], poor: ['🔴 あらい', '顔の 向きだけを つかいます（視線の ばしょは あてに しない）'] }[q.grade];
       S.center.style.cssText = '';
       S.center.innerHTML = '';
-      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：画面の はばの やく ' + Math.round(q.err * 100) + '%（' + (mode === 'x' ? '左右だけ' : '左右・上下') + '）' + (cal ? '' : '　※ 目の 記録が たりませんでした') + (st.debug && cal ? '　[' + cal.set + ' λ' + cal.lam + ' cv' + Math.round(cal.cvErr * 100) + '%]' : '')),
+      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：左右 やく ' + Math.round(q.ex * 100) + '%' + (q.ey != null ? '・上下 やく ' + Math.round(q.ey * 100) + '%' : '') + '（画面の 大きさに たいして）' + (q.grade === 'poor' && q.gradeX !== 'poor' ? '　→ 左右だけなら「' + { good: 'よい', ok: 'ふつう' }[q.gradeX] + '」（どっちを みる？ に つかえます）' : '') + (cal ? '' : '　※ 目の 記録が たりませんでした') + (st.debug && cal ? '　[' + cal.set + ' λ' + cal.lam + ' cv' + Math.round(cal.cvErr * 100) + '%]' : '')),
         h('div', { class: 'row', style: 'justify-content:center' },
           cal ? h('button', { class: 'pill', type: 'button', onclick: () => tryGaze(cal) }, '👁 ためしに 見る') : null,
           h('button', { class: 'pill', type: 'button', onclick: () => exportCalib(samples, vals, cal, q) }, '📤 しらべる データ')),
@@ -93,7 +95,7 @@
   }
   // 調整の ための データ（顔の 点から 計算した 数字だけ。映像は ふくまない）
   function exportCalib(samples, vals, cal, q) {
-    const pick = s => { const f = s.f; return { tx: s.tx, ty: s.ty, f: { ix: r3(f.ix), ixr: r3(f.ixr), ixl: r3(f.ixl), iy: r3(f.iy), ic: r3(f.ic), icr: r3(f.icr), icl: r3(f.icl), open: r3(f.open), yaw: r1(f.yaw), pitch: r1(f.pitch), roll: r1(f.roll), hx: r1(f.hx), hy: r1(f.hy), hz: r1(f.hz), eyeW: r3(f.eyeW), blink: f.blink } }; };
+    const pick = s => { const f = s.f; return { tx: s.tx, ty: s.ty, f: { ix: r3(f.ix), ixr: r3(f.ixr), ixl: r3(f.ixl), iy: r3(f.iy), ic: r3(f.ic), icr: r3(f.icr), icl: r3(f.icl), open: r3(f.open), yaw: r1(f.yaw), pitch: r1(f.pitch), roll: r1(f.roll), hx: r1(f.hx), hy: r1(f.hy), hz: r1(f.hz), eyeW: r3(f.eyeW), blink: f.blink, pu: f.pu == null ? null : r3(f.pu), pv: f.pv == null ? null : r3(f.pv), pur: f.pur == null ? null : r3(f.pur), pul: f.pul == null ? null : r3(f.pul), pvr: f.pvr == null ? null : r3(f.pvr), pvl: f.pvl == null ? null : r3(f.pvl), pc: f.pc == null ? null : Math.round(f.pc) } }; };
     const data = { format: 'mieel-manazashi-calib', at: new Date().toISOString(), ua: navigator.userAgent, screen: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio }, video: { w: video.videoWidth, h: video.videoHeight }, quality: q, set: cal && cal.set, samples: samples.map(pick), vals: vals.map(pick) };
     download('まなざしラボ_しらべるデータ_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '') + '.json', JSON.stringify(data), 'application/json');
   }
