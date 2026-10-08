@@ -191,9 +191,11 @@
     const t = ((ir[0] - a[0]) * ex[0] + (ir[1] - a[1]) * ex[1]) / (L2 || 1);         // 目がしら 0 → 目じり 1
     const ny = [-ex[1] / Lw, ex[0] / Lw];                                              // 目の 線に 直角
     const mid = [(u[0] + d[0]) / 2, (u[1] + d[1]) / 2];
-    const v = ((ir[0] - mid[0]) * ny[0] + (ir[1] - mid[1]) * ny[1]) / Lw;               // 上下
+    const v = ((ir[0] - mid[0]) * ny[0] + (ir[1] - mid[1]) * ny[1]) / Lw;               // 上下（まぶたの まんなか から）
+    // 上下（目がしら と 目じり を むすんだ 線から）。まぶたは 視線と いっしょに 動くので、動かない 目の はし を 基準にも する
+    const vc = ((ir[0] - a[0]) * ny[0] + (ir[1] - a[1]) * ny[1]) / Lw;
     const open = Math.hypot(u[0] - d[0], u[1] - d[1]) / Lw;
-    return { t, v, open, w: Lw };
+    return { t, v, vc, open, w: Lw };
   }
   function headPose(m) {
     if (!m || m.length < 16) return null;
@@ -210,13 +212,14 @@
     const hp = headPose(mat) || { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0, z: -50 };
     let blinkL = 0, blinkR = 0;
     (bs || []).forEach(c => { if (c.categoryName === 'eyeBlinkLeft') blinkL = c.score; if (c.categoryName === 'eyeBlinkRight') blinkR = c.score; });
-    const blink = Math.max(blinkL, blinkR) > 0.5 || (r.open + l.open) / 2 < 0.12;
+    // 下を 見ると まぶたが 下がるので、まばたきは「両目が しっかり とじた」ときだけに する
+    const blink = Math.min(blinkL, blinkR) > 0.6 || (r.open + l.open) / 2 < 0.07;
     // 画面上の 顔の 中心と 大きさ
     const cx = (lm[33].x + lm[263].x) / 2, cy = (lm[33].y + lm[263].y) / 2;
     return {
       ix: (r.t + (1 - l.t)) / 2 - 0.5,     // 左右の 目を そろえた 黒目の 左右（目がしら／目じりの 向きを あわせる）
       ixr: r.t, ixl: l.t,
-      iy: (r.v + l.v) / 2,
+      iy: (r.v + l.v) / 2, ivr: r.v, ivl: l.v, icr: r.vc, icl: l.vc, ic: (r.vc + l.vc) / 2,
       yaw: hp.yaw, pitch: hp.pitch, roll: hp.roll, hx: hp.x, hy: hp.y, hz: hp.z,
       fx: cx, fy: cy, eyeW: (r.w + l.w) / 2 / W,
       blink, open: (r.open + l.open) / 2
@@ -226,7 +229,22 @@
   const facing = f => !!f && Math.abs(f.yaw) < 28 && Math.abs(f.pitch) < 24;
 
   /* ---------- キャリブレーション（リッジ回帰） ---------- */
-  function gazeVec(f, mode) {
+  const SETS = {
+    // 左右だけ
+    x1: f => [1, f.ix],
+    x2: f => [1, f.ix, f.yaw / 30],
+    x3: f => [1, f.ixr, f.ixl, f.yaw / 30],
+    x4: f => [1, f.ix, f.yaw / 30, f.hz ? f.hx / Math.abs(f.hz) : 0],
+    // 左右・上下
+    a: f => [1, f.ix, f.ic],
+    b: f => [1, f.ix, f.ic, f.yaw / 30, f.pitch / 30],
+    c: f => [1, f.ix, f.ic, f.iy, f.open, f.yaw / 30, f.pitch / 30],
+    d: f => [1, f.ixr, f.ixl, f.icr, f.icl, f.yaw / 30, f.pitch / 30],
+    e: f => [1, f.ix, f.ic, f.open, f.yaw / 30, f.pitch / 30, f.hz ? f.hx / Math.abs(f.hz) : 0, f.hz ? f.hy / Math.abs(f.hz) : 0]
+  };
+  function gazeVec(f, mode, set) {
+    if (set && SETS[set]) return SETS[set](f);
+    // むかしの 形式（あとかたの ため）
     const ix = f.ix, iy = f.iy, ya = f.yaw / 30, pi = f.pitch / 30;
     const hx = f.hz ? f.hx / Math.abs(f.hz) : 0, hy = f.hz ? f.hy / Math.abs(f.hz) : 0;
     if (mode === 'x') return [1, ix, ya, hx, ix * ix];
@@ -248,22 +266,52 @@
     return b.map((v, i) => v / (A[i][i] || 1e-9));
   }
   // samples: [{ f, tx, ty }]（tx,ty は 画面の 0〜1）
-  function fitCalib(samples, mode) {
-    const S = samples.filter(s => s.f && !s.f.blink);
-    if (S.length < 8) return null;
-    const X = S.map(s => gazeVec(s.f, mode));
+  // 1つの 点の なかで 外れた 記録（目を はなした・まばたきの とちゅう）を のぞく
+  function trimPoint(g) {
+    if (g.length < 6) return g;
+    const mx = median(g.map(s => s.f.ix)), my = median(g.map(s => s.f.ic));
+    const dx = median(g.map(s => Math.abs(s.f.ix - mx))) || 1e-4, dy = median(g.map(s => Math.abs(s.f.ic - my))) || 1e-4;
+    return g.filter(s => Math.abs(s.f.ix - mx) < dx * 3 && Math.abs(s.f.ic - my) < dy * 3);
+  }
+  function fitWith(S, mode, set, lam) {
+    const X = S.map(s => gazeVec(s.f, mode, set));
     // 特徴の 大きさを そろえる
     const n = X[0].length, mu = new Array(n).fill(0), sg = new Array(n).fill(1);
     for (let j = 1; j < n; j++) { const col = X.map(r => r[j]); mu[j] = mean(col); sg[j] = sd(col) || 1; }
     const Z = X.map(r => r.map((v, j) => j ? (v - mu[j]) / sg[j] : 1));
-    const lam = 0.8;
     const wx = ridge(Z, S.map(s => s.tx), lam);
     const wy = mode === 'x' ? null : ridge(Z, S.map(s => s.ty), lam);
-    return { mode: mode || 'xy', mu, sg, wx, wy, made: Date.now() };
+    return { mode: mode || 'xy', set, lam, mu, sg, wx, wy, made: Date.now() };
+  }
+  // いくつかの 計算方法を ためし、「1点ずつ はずして 当てる」テストで いちばん 当たる ものを えらぶ
+  function fitCalib(samples, mode) {
+    const byPt = {};
+    samples.filter(s => s.f && !s.f.blink).forEach(s => { const k = s.tx + ',' + s.ty; (byPt[k] = byPt[k] || []).push(s); });
+    const groups = Object.values(byPt).map(trimPoint).filter(g => g.length >= 3);
+    const S = [].concat.apply([], groups);
+    if (S.length < 8 || groups.length < 3) return null;
+    const sets = mode === 'x' ? ['x1', 'x2', 'x3', 'x4'] : ['a', 'b', 'c', 'd', 'e'];
+    let best = null;
+    sets.forEach(set => [0.3, 1, 3].forEach(lam => {
+      if (SETS[set](S[0].f).length > groups.length + 1) return;   // 点の 数より 多い 項目は つかわない（覚えすぎ）
+      let err = 0, n = 0;
+      groups.forEach((g, gi) => {
+        const train = [].concat.apply([], groups.filter((_, j) => j !== gi));
+        const m = fitWith(train, mode, set, lam);
+        const ps = g.map(s => predict(m, s.f));
+        const px = median(ps.map(p => p.x)), py = median(ps.map(p => p.y));
+        err += mode === 'x' ? Math.abs(px - g[0].tx) : Math.hypot(px - g[0].tx, py - g[0].ty); n++;
+      });
+      err /= n;
+      if (!best || err < best.err) best = { set, lam, err };
+    }));
+    const cal = fitWith(S, mode, best.set, best.lam);
+    cal.cvErr = best.err;
+    return cal;
   }
   function predict(cal, f) {
     if (!cal || !f) return null;
-    const z = gazeVec(f, cal.mode).map((v, j) => j ? (v - cal.mu[j]) / cal.sg[j] : 1);
+    const z = gazeVec(f, cal.mode, cal.set).map((v, j) => j ? (v - cal.mu[j]) / cal.sg[j] : 1);
     const dot = w => w.reduce((s, x, i) => s + x * z[i], 0);
     return { x: dot(cal.wx), y: cal.wy ? dot(cal.wy) : 0.5 };
   }
@@ -425,7 +473,7 @@
     return Object.values(cats).map(c => ({ cat: c.cat, aPct: c.a + c.b ? c.a / (c.a + c.b) * 100 : NaN, lookMs: c.a + c.b, firstAPct: c.firstN ? c.firstA / c.firstN * 100 : NaN, trials: c.trials }));
   }
 
-  const api = { faceFeatures, facing, headPose, gazeVec, fitCalib, predict, validate, Smoother, headMotion, blinks, lookAways, attention, fixations, gazeSpread, quarters, heatGrid, aoiGrid, cptScore, lookPair, pairSummary, mean, sd, median };
+  const api = { SETS, faceFeatures, facing, headPose, gazeVec, fitCalib, predict, validate, Smoother, headMotion, blinks, lookAways, attention, fixations, gazeSpread, quarters, heatGrid, aoiGrid, cptScore, lookPair, pairSummary, mean, sd, median };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.ML = api;
 })(typeof window !== 'undefined' ? window : this);
 function jaSay(t) {
@@ -518,7 +566,7 @@ function jaSay(t) {
   async function startCam() {
     if (V.stream) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('nocam');
-    V.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } });
+    V.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } });
     video.srcObject = V.stream;
     await timeout(video.play(), 5000, 'play').catch(() => {});
   }
@@ -595,7 +643,7 @@ function jaSay(t) {
   function faceStatus(f) {
     if (!f) return ['🙈 顔が みえません', false];
     const cm = Math.abs(f.hz);
-    if (cm && cm < 28) return ['⬅️ すこし はなれて', false];
+    if (cm && cm < 24) return ['⬅️ すこし はなれて', false];
     if (cm && cm > 85) return ['➡️ すこし ちかづいて', false];
     if (!ML.facing(f)) return ['↩️ 画面の ほうを むいて', false];
     return ['✅ よい いち（' + Math.round(cm) + 'cm）', true];
@@ -636,14 +684,14 @@ function jaSay(t) {
     const startBtn = h('button', { class: 'big-btn go', type: 'button', onclick: () => begin() }, '▶ はじめる');
     S.center.style.cssText = 'justify-content:flex-end;padding-bottom:6vh';
     S.center.append(h('h2', null, '👀 見る ばしょを あわせます'),
-      h('p', null, '顔が 画面に うつるように して、iPad から 40〜70cm くらい はなれます。', h('br'), '「はじめる」の あと、出てくる ひよこを 目で おいかけて もらいます（' + n + 'か所・やく ' + Math.round(n * 1.7 + 6) + 'びょう）。'),
+      h('p', null, '顔が 画面に うつるように して、iPad から 30〜50cm くらい（小さい iPad は ちかめ）に します。', h('br'), '「はじめる」の あと、出てくる ひよこを 目で おいかけて もらいます（' + n + 'か所・やく ' + Math.round(n * 2.1 + 9) + 'びょう）。'),
       h('div', { class: 'row', style: 'justify-content:center' }, startBtn, opt.skippable ? h('button', { class: 'pill', type: 'button', onclick: () => { cancelAnimationFrame(raf); then(null); } }, 'あわせないで すすむ') : null));
     runFace((ff, t) => {
       f = ff;
       const [txt, ok] = faceStatus(f); S.setPv(txt, ok);
       if (phase === 'pts' || phase === 'val') {
         const el = t - t0;
-        if (el > 600 && el < 1500 && f) (phase === 'pts' ? samples : vals).push({ f, tx: seq[k][0], ty: seq[k][1] });
+        if (el > 700 && el < 1950 && f) (phase === 'pts' ? samples : vals).push({ f, tx: seq[k][0], ty: seq[k][1] });
       }
     });
     function begin() {
@@ -658,14 +706,14 @@ function jaSay(t) {
       g.clearRect(0, 0, W, H);
       if (phase !== 'pts' && phase !== 'val') return;
       const el = performance.now() - t0;
-      if (el > 1650) {
+      if (el > 2100) {
         k++; t0 = performance.now();
         if (k >= seq.length) {
           if (phase === 'pts') { phase = 'val'; seq = VAL_PTS(n).map(p => p.slice()); k = 0; SND.soft(); }
           else { finish(); return; }
         } else SND.soft();
       }
-      const [px, py] = seq[k], x = px * W, y = py * H, p = Math.min(1, (performance.now() - t0) / 1650);
+      const [px, py] = seq[k], x = px * W, y = py * H, p = Math.min(1, (performance.now() - t0) / 2100);
       window.__calTarget = seq[k];   // テスト用
       const R = Math.min(W, H) * (0.07 - 0.045 * p);
       g.fillStyle = phase === 'val' ? 'rgba(12,166,120,.18)' : 'rgba(76,110,245,.16)'; g.beginPath(); g.arc(x, y, R * 2.2, 0, 7); g.fill();
@@ -681,14 +729,38 @@ function jaSay(t) {
       const GR = { good: ['✅ よい', '3×3 の ばしょ・ヒートマップまで つかえます'], ok: ['🟡 ふつう', '左右・上下（4つ くらいの ばしょ）の くらべに つかえます'], poor: ['🔴 あらい', '顔の 向きだけを つかいます（視線の ばしょは あてに しない）'] }[q.grade];
       S.center.style.cssText = '';
       S.center.innerHTML = '';
-      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：画面の はばの やく ' + Math.round(q.err * 100) + '%（' + (mode === 'x' ? '左右だけ' : '左右・上下') + '）' + (cal ? '' : '　※ 目の 記録が たりませんでした')),
+      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：画面の はばの やく ' + Math.round(q.err * 100) + '%（' + (mode === 'x' ? '左右だけ' : '左右・上下') + '）' + (cal ? '' : '　※ 目の 記録が たりませんでした') + (st.debug && cal ? '　[' + cal.set + ' λ' + cal.lam + ' cv' + Math.round(cal.cvErr * 100) + '%]' : '')),
+        h('div', { class: 'row', style: 'justify-content:center' },
+          cal ? h('button', { class: 'pill', type: 'button', onclick: () => tryGaze(cal) }, '👁 ためしに 見る') : null,
+          h('button', { class: 'pill', type: 'button', onclick: () => exportCalib(samples, vals, cal, q) }, '📤 しらべる データ')),
         h('div', { class: 'row', style: 'justify-content:center' },
           h('button', { class: 'big-btn go', type: 'button', disabled: !cal, onclick: async () => { const c = { id: st.kid, cal, quality: q, at: Date.now() }; CAL[st.kid] = c; try { await DB.put('calibs', c); } catch (e) { /* 無視 */ } then(c); } }, '✔ これで つかう'),
           h('button', { class: 'pill', type: 'button', onclick: () => go(() => runCalib(then, opt)) }, '🔁 もういちど'),
           opt.skippable ? h('button', { class: 'pill', type: 'button', onclick: () => then(null) }, 'あわせないで すすむ') : null));
       if (q.grade !== 'poor') SND.ding();
     }
+    // 見ている ところに 点を 出す（15びょう）。3×3 の ます目つき
+    function tryGaze(cal) {
+      const sm = new ML.Smoother(0.25), keep = S.center.innerHTML === '' ? null : Array.from(S.center.childNodes);
+      S.center.innerHTML = ''; let p = null, end = performance.now() + 15000, r2 = 0;
+      runFace(f => { if (f && !f.blink) p = sm.push(ML.predict(cal, f)); S.setPv(faceStatus(f)[0], faceStatus(f)[1]); });
+      const loop = () => {
+        const now = performance.now();
+        const { W, H } = S.fit(), g = S.g; g.clearRect(0, 0, W, H);
+        g.strokeStyle = '#E9ECEF'; g.lineWidth = 2; [1, 2].forEach(i => { g.beginPath(); g.moveTo(W * i / 3, 0); g.lineTo(W * i / 3, H); g.moveTo(0, H * i / 3); g.lineTo(W, H * i / 3); g.stroke(); });
+        g.fillStyle = '#868E96'; g.font = '600 16px sans-serif'; g.textAlign = 'center'; g.fillText('見ている ところに 赤い 点が 出ます（のこり ' + Math.ceil((end - now) / 1000) + 'びょう）', W / 2, 30);
+        if (p) { const x = clamp(p.x, 0, 1) * W, y = (cal.mode === 'x' ? 0.5 : clamp(p.y, 0, 1)) * H; g.fillStyle = 'rgba(224,49,49,.75)'; g.beginPath(); g.arc(x, y, 22, 0, 7); g.fill(); g.fillStyle = 'rgba(224,49,49,.15)'; g.fillRect(Math.floor(x / (W / 3)) * W / 3, cal.mode === 'x' ? 0 : Math.floor(y / (H / 3)) * H / 3, W / 3, cal.mode === 'x' ? H : H / 3); }
+        if (now < end) r2 = requestAnimationFrame(loop); else { V.onFrame = null; g.clearRect(0, 0, W, H); if (keep) keep.forEach(n => S.center.appendChild(n)); }
+      };
+      r2 = requestAnimationFrame(loop);
+    }
     leave = () => { cancelAnimationFrame(raf); stopCam(); };
+  }
+  // 調整の ための データ（顔の 点から 計算した 数字だけ。映像は ふくまない）
+  function exportCalib(samples, vals, cal, q) {
+    const pick = s => { const f = s.f; return { tx: s.tx, ty: s.ty, f: { ix: r3(f.ix), ixr: r3(f.ixr), ixl: r3(f.ixl), iy: r3(f.iy), ic: r3(f.ic), icr: r3(f.icr), icl: r3(f.icl), open: r3(f.open), yaw: r1(f.yaw), pitch: r1(f.pitch), roll: r1(f.roll), hx: r1(f.hx), hy: r1(f.hy), hz: r1(f.hz), eyeW: r3(f.eyeW), blink: f.blink } }; };
+    const data = { format: 'mieel-manazashi-calib', at: new Date().toISOString(), ua: navigator.userAgent, screen: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio }, video: { w: video.videoWidth, h: video.videoHeight }, quality: q, set: cal && cal.set, samples: samples.map(pick), vals: vals.map(pick) };
+    download('まなざしラボ_しらべるデータ_' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '') + '.json', JSON.stringify(data), 'application/json');
   }
   // 課題の まえ：45分 いないの あわせが あれば つかうか きく
   function withCalib(need, then) {
@@ -782,7 +854,7 @@ function jaSay(t) {
     const trials = shuffle(list.flatMap(c => [Object.assign({}, c, { aSide: 'L' }), Object.assign({}, c, { aSide: 'R' })]));
     const S = await openStage({ onQuit: () => go(renderHome) });
     if (!S) return;
-    const cal = calib && calib.cal, sm = new ML.Smoother(0.35);
+    const cal = calib && calib.cal, sm = new ML.Smoother(0.25);
     let all = [], i = -1, phase = 'intro', t0 = 0, raf = 0, curStream = null;
     const out = [];
     S.center.append(h('h2', null, '🙂 がめんを みてね'), h('p', null, 'いろいろな ものが 出てきます。すきな ほうを みてね。'), h('button', { class: 'big-btn go', type: 'button', onclick: () => { S.center.innerHTML = ''; next(); } }, '▶ スタート'));
@@ -847,7 +919,7 @@ function jaSay(t) {
     const P = CPT_PAIRS[st.cptPair] || CPT_PAIRS[0], tap = st.cptMode === 'tap';
     const S = await openStage({ onQuit: () => finish(true) });
     if (!S) return;
-    const cal = calib && calib.cal, sm = new ML.Smoother(0.35);
+    const cal = calib && calib.cal, sm = new ML.Smoother(0.25);
     let phase = 'intro', all = [], trials = [], curT = null, raf = 0, endAt = 0, nextAt = 0, practice = [], pi = 0, fb = null;
     const STIM = 800;
     runFace((f, t) => { const s = sampleOf(f, t, cal, sm); if (phase === 'main') all.push(s); S.setPv(faceStatus(f)[0], faceStatus(f)[1]); });

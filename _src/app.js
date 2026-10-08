@@ -79,7 +79,7 @@
   async function startCam() {
     if (V.stream) return;
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('nocam');
-    V.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } });
+    V.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } });
     video.srcObject = V.stream;
     await timeout(video.play(), 5000, 'play').catch(() => {});
   }
@@ -156,7 +156,7 @@
   function faceStatus(f) {
     if (!f) return ['🙈 顔が みえません', false];
     const cm = Math.abs(f.hz);
-    if (cm && cm < 28) return ['⬅️ すこし はなれて', false];
+    if (cm && cm < 24) return ['⬅️ すこし はなれて', false];
     if (cm && cm > 85) return ['➡️ すこし ちかづいて', false];
     if (!ML.facing(f)) return ['↩️ 画面の ほうを むいて', false];
     return ['✅ よい いち（' + Math.round(cm) + 'cm）', true];
