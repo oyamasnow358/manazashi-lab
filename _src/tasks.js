@@ -61,12 +61,12 @@
       // 9点で 計算 → のこりの 点で たしかめ → さいごは ぜんぶの 点で 計算しなおす（点が ふえるほど よい）
       const cal0 = ML.fitCalib(samples, mode);
       const q = cal0 ? ML.validate(cal0, vals) : { err: 1, ex: 1, ey: 1, grade: 'poor', gradeX: 'poor', points: 0 };
-      const cal = cal0 ? (ML.fitCalib(samples.concat(vals), mode, { sets: [cal0.set] }) || cal0) : null;
+      const cal = cal0 ? (ML.fitCalib(samples.concat(vals), mode, { sets: cal0.ySet && cal0.ySet !== cal0.set ? [cal0.set, cal0.ySet] : [cal0.set] }) || cal0) : null;
       const { W, H } = S.fit(); S.g.clearRect(0, 0, W, H);
       const GR = { good: ['✅ よい', '3×3 の ばしょ・ヒートマップまで つかえます'], ok: ['🟡 ふつう', '左右・上下（4つ くらいの ばしょ）の くらべに つかえます'], poor: ['🔴 あらい', '顔の 向きだけを つかいます（視線の ばしょは あてに しない）'] }[q.grade];
       S.center.style.cssText = '';
       S.center.innerHTML = '';
-      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：左右 やく ' + Math.round(q.ex * 100) + '%' + (q.ey != null ? '・上下 やく ' + Math.round(q.ey * 100) + '%' : '') + '（画面の 大きさに たいして）' + (q.grade === 'poor' && q.gradeX !== 'poor' ? '　→ 左右だけなら「' + { good: 'よい', ok: 'ふつう' }[q.gradeX] + '」（どっちを みる？ に つかえます）' : '') + (cal ? '' : '　※ 目の 記録が たりませんでした') + (st.debug && cal ? '　[' + cal.set + ' λ' + cal.lam + ' cv' + Math.round(cal.cvErr * 100) + '%]' : '')),
+      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：左右 やく ' + Math.round(q.ex * 100) + '%' + (q.ey != null ? '・上下 やく ' + Math.round(q.ey * 100) + '%' : '') + '（画面の 大きさに たいして）' + (q.grade === 'poor' && q.gradeX !== 'poor' ? '　→ 左右だけなら「' + { good: 'よい', ok: 'ふつう' }[q.gradeX] + '」（どっちを みる？ に つかえます）' : '') + (cal ? '' : '　※ 目の 記録が たりませんでした') + (st.debug && cal ? '　[' + cal.set + '/' + (cal.ySet || cal.set) + ' cv ' + Math.round(cal.cvX * 100) + '%/' + Math.round((cal.cvY || 0) * 100) + '%]' : '')),
         h('div', { class: 'row', style: 'justify-content:center' },
           cal ? h('button', { class: 'pill', type: 'button', onclick: () => tryGaze(cal) }, '👁 ためしに 見る') : null,
           h('button', { class: 'pill', type: 'button', onclick: () => exportCalib(samples, vals, cal, q) }, '📤 しらべる データ')),

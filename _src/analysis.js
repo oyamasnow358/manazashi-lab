@@ -139,29 +139,33 @@
     // 数が ない（むかしの データ・黒目が 見つからない）組みあわせは はぶく
     const sets = ((opt && opt.sets) || (mode === 'x' ? X_SETS : XY_SETS)).filter(k => S.every(sm => SETS[k](sm.f).every(v => typeof v === 'number' && isFinite(v))));
     if (!sets.length) return null;
-    let best = null;
+    // 左右と 上下で、それぞれ いちばん 当たる 式を 別々に えらぶ
+    let bx = null, by = null;
     sets.forEach(set => [0.3, 1, 3].forEach(lam => {
       if (SETS[set](S[0].f).length > groups.length + 1) return;   // 点の 数より 多い 項目は つかわない（覚えすぎ）
-      let err = 0, n = 0;
+      let ex = 0, ey = 0, n = 0;
       groups.forEach((g, gi) => {
         const train = [].concat.apply([], groups.filter((_, j) => j !== gi));
         const m = fitWith(train, mode, set, lam);
         const ps = g.map(s => predict(m, s.f));
-        const px = median(ps.map(p => p.x)), py = median(ps.map(p => p.y));
-        err += mode === 'x' ? Math.abs(px - g[0].tx) : Math.hypot(px - g[0].tx, py - g[0].ty); n++;
+        ex += Math.abs(median(ps.map(p => p.x)) - g[0].tx); ey += Math.abs(median(ps.map(p => p.y)) - g[0].ty); n++;
       });
-      err /= n;
-      if (!best || err < best.err) best = { set, lam, err };
+      ex /= n; ey /= n;
+      if (!bx || ex < bx.err) bx = { set, lam, err: ex };
+      if (mode !== 'x' && (!by || ey < by.err)) by = { set, lam, err: ey };
     }));
-    const cal = fitWith(S, mode, best.set, best.lam);
-    cal.cvErr = best.err;
+    const cal = fitWith(S, mode, bx.set, bx.lam);
+    if (by) { const cy = fitWith(S, mode, by.set, by.lam); cal.ySet = by.set; cal.yLam = by.lam; cal.ymu = cy.mu; cal.ysg = cy.sg; cal.wy = cy.wy; }
+    cal.cvErr = by ? Math.hypot(bx.err, by.err) : bx.err; cal.cvX = bx.err; cal.cvY = by ? by.err : null;
     return cal;
   }
   function predict(cal, f) {
     if (!cal || !f) return null;
     const z = gazeVec(f, cal.mode, cal.set).map((v, j) => j ? (v - cal.mu[j]) / cal.sg[j] : 1);
-    const dot = w => w.reduce((s, x, i) => s + x * z[i], 0);
-    return { x: dot(cal.wx), y: cal.wy ? dot(cal.wy) : 0.5 };
+    const dot = (w, zz) => w.reduce((s, x, i) => s + x * zz[i], 0);
+    // 上下は 別の 式（ySet）の ことが ある
+    const zy = cal.ySet ? gazeVec(f, cal.mode, cal.ySet).map((v, j) => j ? (v - cal.ymu[j]) / cal.ysg[j] : 1) : z;
+    return { x: dot(cal.wx, z), y: cal.wy ? dot(cal.wy, zy) : 0.5 };
   }
   // 検証：[{ f, tx, ty }] → 平均の ずれ（画面の 幅＝1）と 精度の めやす
   function validate(cal, samples) {

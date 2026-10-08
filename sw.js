@@ -1,5 +1,5 @@
 // オフラインでも つかえるように する（はじめて ひらいた ときに 読みとりの モデルも 保存）
-const CACHE = 'manazashi-4650d7612d';
+const CACHE = 'manazashi-4be47bfb9c';
 const CORE = ['./', 'index.html', 'vendor/vision_bundle.js', 'vendor/wasm/vision_wasm_internal.js', 'vendor/wasm/vision_wasm_internal.wasm', 'vendor/models/face_landmarker.task'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('manazashi-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
