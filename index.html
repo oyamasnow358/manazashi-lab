@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<!--
+  © 2026 MieeL（ミエル） https://www.mieel-support-school.com/  All rights reserved.
+  学校・家庭・療育機関などで子どもの学習や支援に使うことは自由です。
+  プログラム・画像・文章の無断転載・複製、改変しての公開・再配布、販売はお断りします（くわしくは LICENSE.md）。
+  顔の読み取りには Google MediaPipe（Apache License 2.0）を使っています（vendor/）。
+-->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="まなざしラボ">
+<meta name="theme-color" content="#F1F3FA">
+<title>まなざし ラボ｜MieeL</title>
+<link rel="apple-touch-icon" id="touchIcon" href="">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%91%80%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #F1F3FA; --card: #fff; --ink: #1F2937; --sub: #667085; --line: #DCE1EE; --main: #4C6EF5; --main-d: #3B5BDB; --go: #2F9E44; --go-d: #237A34;
+    --red: #E03131; --or: #F08C00; --teal: #0CA678; --vio: #7048E8;
+    --c1: #4C6EF5; --c2: #F08C00; --c3: #0CA678; --c4: #E64980;
+    --mieel: radial-gradient(circle at 50% 0%,#1B8FE8 0%,#2BB8D6 28%,#3FCB9E 45%,#8FD24A 58%,#F4D027 72%,#F7941E 100%);
+    --emoji: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--bg); color: var(--ink); font-family: "Hiragino Maru Gothic ProN","ヒラギノ丸ゴ ProN","BIZ UDPGothic","Yu Gothic UI","Meiryo",system-ui,sans-serif; font-weight: 600;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; overscroll-behavior: none;
+    display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
+  input, select, textarea { font: inherit; -webkit-user-select: text; user-select: text; }
+  .emo { font-family: var(--emoji); font-weight: 400; line-height: 1; }
+  [hidden] { display: none !important; }
+  .topbar { flex: none; display: flex; align-items: center; gap: 10px; padding: 6px 14px; min-height: 56px; }
+  .brand { flex: 1; display: flex; justify-content: center; align-items: center; gap: 12px; color: #5C6B9C; font-size: 15px; letter-spacing: .06em; min-width: 0; }
+  .mieel-brand { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .orb-mini { width: 22px; height: 22px; border-radius: 50%; background: var(--mieel); flex: none; }
+  .mieel-brand strong { font-size: 16px; color: var(--ink); }
+  .mieel-brand .url { font-size: 12px; color: var(--sub); font-weight: 600; }
+  @media (max-width: 699px) { .topbar .url, .topbar .appname { display: none; } }
+  .tbtn { height: 46px; min-width: 46px; padding: 0 14px; border-radius: 999px; border: 2px solid var(--line); background: #fff; font-size: 15px; display: flex; align-items: center; gap: 6px; }
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 16px 14px; }
+  body.playing .topbar { display: none; } body.playing main { padding: 0; }
+  .screen { flex: 1; min-height: 0; display: flex; flex-direction: column; animation: fadein .2s ease-out; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { 0% { transform: scale(.5); opacity: 0; } 70% { transform: scale(1.06); } 100% { transform: none; opacity: 1; } }
+  .scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .big-btn { min-height: 64px; padding: 0 26px; border: none; border-radius: 999px; color: #fff; font-size: clamp(18px, 2.4vw, 24px); display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--main); box-shadow: 0 6px 0 var(--main-d); }
+  .big-btn.go { background: var(--go); box-shadow: 0 6px 0 var(--go-d); }
+  .big-btn:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.2); }
+  .big-btn:disabled { opacity: .45; }
+  .pill { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 2px solid var(--line); background: #fff; font-size: 15px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .pill:active { transform: translateY(2px); }
+  .pill.on { border-color: var(--main); background: #EDF2FF; color: var(--main-d); }
+  .pill.danger { color: var(--red); border-color: #FFC9C9; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .help { color: var(--sub); font-weight: 500; font-size: 14px; line-height: 1.7; margin: 0; }
+  h2.t { margin: 0; font-size: clamp(20px, 2.6vw, 26px); }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 22px; padding: 16px; }
+
+  /* ホーム */
+  .home { gap: 14px; }
+  .kids { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .kid { min-height: 52px; padding: 0 18px; border-radius: 16px; border: 3px solid var(--line); background: #fff; font-size: 18px; display: inline-flex; align-items: center; gap: 8px; }
+  .kid.on { border-color: var(--main); background: #EDF2FF; }
+  .kid.add { border-style: dashed; color: var(--main); }
+  .tasks { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 14px; }
+  .tcard { position: relative; text-align: left; border: 3px solid var(--line); background: #fff; border-radius: 24px; padding: 16px; display: flex; gap: 14px; align-items: flex-start; box-shadow: 0 5px 0 rgba(0,0,0,.05); min-height: 120px; }
+  .tcard:active { transform: translateY(4px); box-shadow: none; }
+  .tcard .emo { font-size: 48px; flex: none; }
+  .tcard b { font-size: 20px; display: block; }
+  .tcard small { color: var(--sub); font-weight: 500; font-size: 13.5px; line-height: 1.6; display: block; margin-top: 4px; }
+  .tcard .tag { position: absolute; right: 12px; top: 10px; font-size: 11px; padding: 2px 8px; border-radius: 8px; background: #EDF2FF; color: var(--main-d); }
+  .calbadge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 14px; background: #fff; border: 2px solid var(--line); }
+  .calbadge.good { border-color: #8CE99A; background: #EBFBEE; } .calbadge.ok { border-color: #FFE066; background: #FFF9DB; } .calbadge.poor { border-color: #FFA8A8; background: #FFF5F5; }
+
+  /* 全画面の 課題 */
+  .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #FDFDFE; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .stage .quit { position: absolute; left: 12px; top: calc(10px + env(safe-area-inset-top)); z-index: 5; overflow: hidden; border: 2px solid #DEE2E6; background: rgba(255,255,255,.9); color: #868E96; font-size: 14px; padding: 8px 12px; border-radius: 999px; touch-action: none; opacity: .6; }
+  .stage .quit i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #FFE3E3; } .stage .quit span { position: relative; }
+  .stage .quit.pressing { opacity: 1; color: var(--red); } .stage .quit.pressing i { width: 100%; transition: width 1.5s linear; }
+  .stage .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; padding: 20px; }
+  .stage .center h2 { margin: 0; font-size: clamp(26px, 4vw, 40px); }
+  .stage .center p { margin: 0; color: var(--sub); font-size: 18px; line-height: 1.7; max-width: 720px; }
+  .stage .pv { position: absolute; right: 12px; bottom: 12px; width: 200px; aspect-ratio: 4/3; border-radius: 14px; overflow: hidden; border: 3px solid #fff; box-shadow: 0 6px 18px rgba(0,0,0,.18); background: #000; }
+  .stage .pv video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+  .stage .pv .st { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; padding: 4px 8px; text-align: center; }
+  .stage .dbg { position: absolute; left: 12px; bottom: 10px; font-size: 12px; color: #868E96; font-weight: 500; }
+  .loading { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-size: 18px; color: var(--sub); background: #FDFDFE; z-index: 6; padding: 20px; line-height: 1.7; }
+  .loading .emo { font-size: 54px; display: block; }
+
+  /* レポート */
+  .rep { gap: 12px; }
+  .rephead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .rephead h2 { flex: 1; margin: 0; font-size: clamp(20px, 2.6vw, 26px); }
+  .slist { display: flex; flex-direction: column; gap: 8px; }
+  .sitem { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: #fff; border: 2px solid var(--line); text-align: left; }
+  .sitem .emo { font-size: 30px; } .sitem b { font-size: 17px; } .sitem small { display: block; color: var(--sub); font-weight: 500; }
+  .metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .metric { background: #fff; border: 2px solid var(--line); border-radius: 18px; padding: 12px 14px; }
+  .metric .k { font-size: 13px; color: var(--sub); }
+  .metric .v { font-size: 28px; font-weight: 800; margin-top: 2px; }
+  .metric .v small { font-size: 14px; color: var(--sub); font-weight: 600; margin-left: 2px; }
+  .metric .cmp { font-size: 12.5px; margin-top: 4px; color: var(--sub); }
+  .metric .cmp b { color: var(--ink); }
+  .section { display: flex; flex-direction: column; gap: 10px; }
+  .section h3 { margin: 6px 0 0; font-size: 18px; }
+  .chart { width: 100%; height: 220px; display: block; background: #fff; border: 2px solid var(--line); border-radius: 18px; }
+  .note { background: #FFF9DB; border: 2px solid #FFE066; border-radius: 16px; padding: 10px 14px; font-size: 14px; line-height: 1.7; font-weight: 500; }
+  .note.info { background: #EDF2FF; border-color: #BAC8FF; }
+  textarea.memo { width: 100%; min-height: 90px; border: 2px solid var(--line); border-radius: 14px; padding: 10px 12px; font-size: 15px; font-weight: 500; resize: vertical; }
+  .heat { position: relative; width: min(100%, 720px); border-radius: 16px; overflow: hidden; border: 2px solid var(--line); background: #fff; }
+  .heat img, .heat canvas { display: block; width: 100%; }
+  .heat canvas { position: absolute; inset: 0; height: 100%; }
+  table.t { border-collapse: collapse; font-size: 14px; } table.t td, table.t th { border: 1px solid var(--line); padding: 6px 10px; text-align: center; font-weight: 600; } table.t th { background: #F8F9FC; color: var(--sub); font-size: 12.5px; }
+
+  /* モーダル */
+  .modal { position: fixed; inset: 0; z-index: 60; background: rgba(15,23,42,.45); display: none; align-items: center; justify-content: center; padding: 16px; }
+  .modal.open { display: flex; }
+  .sheet { background: #fff; border-radius: 26px; width: min(780px, 100%); max-height: 100%; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .shead { flex: none; display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 2px solid #EEF2F7; }
+  .shead h2 { flex: 1; margin: 0; font-size: 21px; }
+  .tabs { display: flex; gap: 6px; padding: 10px 14px 0; flex-wrap: wrap; }
+  .tabs button { height: 44px; padding: 0 14px; border-radius: 14px 14px 0 0; border: 2px solid var(--line); border-bottom: none; background: #F8FAFC; font-size: 15px; }
+  .tabs button.on { background: #fff; color: var(--main-d); border-color: var(--main); }
+  .sbody { flex: 1; overflow-y: auto; padding: 14px 18px 22px; display: flex; flex-direction: column; gap: 12px; -webkit-overflow-scrolling: touch; }
+  .field { display: flex; flex-direction: column; gap: 4px; } .field input, .field select { height: 46px; border-radius: 12px; border: 2px solid var(--line); padding: 0 12px; font-size: 16px; }
+  .seg { display: inline-flex; border: 2px solid var(--line); border-radius: 14px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { min-height: 42px; padding: 0 12px; border: none; background: #fff; font-size: 14.5px; border-right: 2px solid var(--line); }
+  .seg button:last-child { border-right: none; } .seg button.on { background: var(--main); color: #fff; }
+  .lic, .doc { font-size: 15px; font-weight: 500; line-height: 1.8; }
+  .lic h3, .doc h3 { font-size: 17px; margin: 12px 0 4px; } .lic h3:first-child, .doc h3:first-child { margin-top: 0; }
+  .lic p, .doc p { margin: 0 0 6px; } .lic a, .doc a { color: #1864AB; }
+  .licitem { border: 2px solid #EEF2F7; border-radius: 14px; padding: 10px 14px; margin-bottom: 8px; }
+  .lic pre { white-space: pre-wrap; font-size: 11px; line-height: 1.5; background: #F8F9FA; border-radius: 10px; padding: 10px; max-height: 320px; overflow-y: auto; -webkit-user-select: text; user-select: text; }
+  .toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); z-index: 80; background: #1F2937; color: #fff; padding: 12px 22px; border-radius: 999px; font-size: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: 92vw; text-align: center; }
+
+  /* いんさつ（A4 たて） */
+  @media print {
+    @page { size: A4 portrait; margin: 12mm; }
+    body { display: block; height: auto; overflow: visible; background: #fff; padding: 0; }
+    .topbar, .noprint, .modal, .toast { display: none !important; }
+    main { padding: 0; display: block; } .screen { display: block; animation: none; } .scroll { overflow: visible; }
+    .metric, .chart, .card, .heat { break-inside: avoid; } .chart { border-color: #ccc; }
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="tbtn" id="homeBtn" type="button" hidden>🏠 <span>ホーム</span></button>
+  <div class="brand"><span class="mieel-brand"><span class="orb-mini"></span><strong>MieeL</strong><span class="url">www.mieel-support-school.com</span></span><span class="appname">まなざし ラボ</span></div>
+  <button class="tbtn" id="menuBtn" type="button">⚙️ <span>メニュー</span></button>
+</div>
+<main id="main"></main>
+<div class="modal" id="menu"><div class="sheet">
+  <div class="shead"><h2>⚙️ メニュー</h2><button class="pill" type="button" id="mClose">とじる</button></div>
+  <div class="tabs" id="mTabs"></div>
+  <div class="sbody" id="mBody"></div>
+</div></div>
+<input type="file" id="fileIn" hidden>
+<video id="video" playsinline webkit-playsinline muted autoplay></video>
+<style>#video:not(.shown) { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }</style>
+<script>
+/* ============================================================
+   まなざし ラボ：計算の しくみ（ブラウザでも node でも 動く）
+   ・顔の点 → 目と 顔の 特徴
+   ・キャリブレーション（リッジ回帰）→ 画面の どこを 見ているか
+   ・指標（画面を 向いていた 割合・よそ見・頭の 動き・まばたき・注視・CPT・みくらべ・ヒートマップ）
+   ============================================================ */
+(function (root) {
+  'use strict';
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
+  const sd = a => { if (a.length < 2) return NaN; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1)); };
+  const median = a => { if (!a.length) return NaN; const b = a.slice().sort((x, y) => x - y), k = b.length >> 1; return b.length % 2 ? b[k] : (b[k - 1] + b[k]) / 2; };
+
+  /* ---------- 顔の 点 → 特徴 ----------
+     lm: 478点（x,y 0〜1）、W,H: 映像の 大きさ、mat: 4x4（列ごと）、bs: ブレンドシェイプ [{categoryName, score}] */
+  const EYE = {
+    r: { inner: 133, outer: 33, up: 159, low: 145, iris: 468 },   // その人の 右目
+    l: { inner: 362, outer: 263, up: 386, low: 374, iris: 473 }    // その人の 左目
+  };
+  function eyeFeat(lm, W, H, e) {
+    const P = i => [lm[i].x * W, lm[i].y * H];
+    const a = P(e.inner), b = P(e.outer), ir = P(e.iris), u = P(e.up), d = P(e.low);
+    const ex = [b[0] - a[0], b[1] - a[1]], L2 = ex[0] * ex[0] + ex[1] * ex[1], Lw = Math.sqrt(L2) || 1;
+    const t = ((ir[0] - a[0]) * ex[0] + (ir[1] - a[1]) * ex[1]) / (L2 || 1);         // 目がしら 0 → 目じり 1
+    const ny = [-ex[1] / Lw, ex[0] / Lw];                                              // 目の 線に 直角
+    const mid = [(u[0] + d[0]) / 2, (u[1] + d[1]) / 2];
+    const v = ((ir[0] - mid[0]) * ny[0] + (ir[1] - mid[1]) * ny[1]) / Lw;               // 上下
+    const open = Math.hypot(u[0] - d[0], u[1] - d[1]) / Lw;
+    return { t, v, open, w: Lw };
+  }
+  function headPose(m) {
+    if (!m || m.length < 16) return null;
+    // 列ごとの 4x4 → 回転 R（行 r, 列 c = m[c*4+r]）
+    const R = (r, c) => m[c * 4 + r];
+    const yaw = Math.atan2(R(0, 2), R(2, 2)) * 180 / Math.PI;
+    const pitch = Math.asin(clamp(-R(1, 2), -1, 1)) * 180 / Math.PI;
+    const roll = Math.atan2(R(1, 0), R(1, 1)) * 180 / Math.PI;
+    return { yaw, pitch, roll, x: m[12], y: m[13], z: m[14] };   // x,y,z は cm（カメラ基準）
+  }
+  function faceFeatures(lm, W, H, mat, bs) {
+    if (!lm || lm.length < 478) return null;
+    const r = eyeFeat(lm, W, H, EYE.r), l = eyeFeat(lm, W, H, EYE.l);
+    const hp = headPose(mat) || { yaw: 0, pitch: 0, roll: 0, x: 0, y: 0, z: -50 };
+    let blinkL = 0, blinkR = 0;
+    (bs || []).forEach(c => { if (c.categoryName === 'eyeBlinkLeft') blinkL = c.score; if (c.categoryName === 'eyeBlinkRight') blinkR = c.score; });
+    const blink = Math.max(blinkL, blinkR) > 0.5 || (r.open + l.open) / 2 < 0.12;
+    // 画面上の 顔の 中心と 大きさ
+    const cx = (lm[33].x + lm[263].x) / 2, cy = (lm[33].y + lm[263].y) / 2;
+    return {
+      ix: (r.t + (1 - l.t)) / 2 - 0.5,     // 左右の 目を そろえた 黒目の 左右（目がしら／目じりの 向きを あわせる）
+      ixr: r.t, ixl: l.t,
+      iy: (r.v + l.v) / 2,
+      yaw: hp.yaw, pitch: hp.pitch, roll: hp.roll, hx: hp.x, hy: hp.y, hz: hp.z,
+      fx: cx, fy: cy, eyeW: (r.w + l.w) / 2 / W,
+      blink, open: (r.open + l.open) / 2
+    };
+  }
+  // 画面を 向いているか（キャリブレーション なしでも わかる）
+  const facing = f => !!f && Math.abs(f.yaw) < 28 && Math.abs(f.pitch) < 24;
+
+  /* ---------- キャリブレーション（リッジ回帰） ---------- */
+  function gazeVec(f, mode) {
+    const ix = f.ix, iy = f.iy, ya = f.yaw / 30, pi = f.pitch / 30;
+    const hx = f.hz ? f.hx / Math.abs(f.hz) : 0, hy = f.hz ? f.hy / Math.abs(f.hz) : 0;
+    if (mode === 'x') return [1, ix, ya, hx, ix * ix];
+    return [1, ix, iy, ya, pi, hx, hy, ix * ix, iy * iy, ix * iy, ix * ya, iy * pi];
+  }
+  // X: 特徴の ならび、y: 目標 → 重み（(XᵀX + λI)⁻¹ Xᵀy）
+  function ridge(X, y, lam) {
+    const n = X[0].length, A = [], b = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) { A.push(new Array(n).fill(0)); }
+    X.forEach((row, k) => { for (let i = 0; i < n; i++) { b[i] += row[i] * y[k]; for (let j = 0; j < n; j++) A[i][j] += row[i] * row[j]; } });
+    for (let i = 1; i < n; i++) A[i][i] += lam;   // 定数項には かけない
+    // ガウスの 消去法
+    for (let c = 0; c < n; c++) {
+      let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+      [A[c], A[p]] = [A[p], A[c]]; [b[c], b[p]] = [b[p], b[c]];
+      const d = A[c][c] || 1e-9;
+      for (let r = 0; r < n; r++) { if (r === c) continue; const k = A[r][c] / d; if (!k) continue; for (let j = c; j < n; j++) A[r][j] -= k * A[c][j]; b[r] -= k * b[c]; }
+    }
+    return b.map((v, i) => v / (A[i][i] || 1e-9));
+  }
+  // samples: [{ f, tx, ty }]（tx,ty は 画面の 0〜1）
+  function fitCalib(samples, mode) {
+    const S = samples.filter(s => s.f && !s.f.blink);
+    if (S.length < 8) return null;
+    const X = S.map(s => gazeVec(s.f, mode));
+    // 特徴の 大きさを そろえる
+    const n = X[0].length, mu = new Array(n).fill(0), sg = new Array(n).fill(1);
+    for (let j = 1; j < n; j++) { const col = X.map(r => r[j]); mu[j] = mean(col); sg[j] = sd(col) || 1; }
+    const Z = X.map(r => r.map((v, j) => j ? (v - mu[j]) / sg[j] : 1));
+    const lam = 0.8;
+    const wx = ridge(Z, S.map(s => s.tx), lam);
+    const wy = mode === 'x' ? null : ridge(Z, S.map(s => s.ty), lam);
+    return { mode: mode || 'xy', mu, sg, wx, wy, made: Date.now() };
+  }
+  function predict(cal, f) {
+    if (!cal || !f) return null;
+    const z = gazeVec(f, cal.mode).map((v, j) => j ? (v - cal.mu[j]) / cal.sg[j] : 1);
+    const dot = w => w.reduce((s, x, i) => s + x * z[i], 0);
+    return { x: dot(cal.wx), y: cal.wy ? dot(cal.wy) : 0.5 };
+  }
+  // 検証：[{ f, tx, ty }] → 平均の ずれ（画面の 幅＝1）と 精度の めやす
+  function validate(cal, samples) {
+    const errs = [];
+    const byPt = {};
+    samples.forEach(s => { if (!s.f || s.f.blink) return; const k = s.tx + ',' + s.ty; (byPt[k] = byPt[k] || []).push(s); });
+    Object.values(byPt).forEach(g => {
+      const ps = g.map(s => predict(cal, s.f)).filter(Boolean);
+      if (!ps.length) return;
+      const px = median(ps.map(p => p.x)), py = median(ps.map(p => p.y));
+      errs.push(cal.mode === 'x' ? Math.abs(px - g[0].tx) : Math.hypot(px - g[0].tx, py - g[0].ty));
+    });
+    const e = errs.length ? mean(errs) : 1;
+    const grade = cal.mode === 'x' ? (e < 0.12 ? 'good' : e < 0.2 ? 'ok' : 'poor') : (e < 0.11 ? 'good' : e < 0.19 ? 'ok' : 'poor');
+    return { err: e, grade, points: errs.length };
+  }
+
+  /* ---------- 視線の なめらか ---------- */
+  function Smoother(alpha) { this.a = alpha || 0.35; this.x = null; this.y = null; }
+  Smoother.prototype.push = function (p) { if (!p) return null; if (this.x == null) { this.x = p.x; this.y = p.y; } else { this.x += (p.x - this.x) * this.a; this.y += (p.y - this.y) * this.a; } return { x: this.x, y: this.y }; };
+
+  /* ---------- 指標 ----------
+     stream: [{ t(ms), f:facing(0/1), g:gaze あり(0/1), x, y, bl:まばたき(0/1), hx, hy, hz(cm), yaw, pitch }] */
+  function headMotion(stream) {
+    // 頭の 位置の 移動きょり（cm）と 回転（度）
+    let dist = 0, rot = 0, events = 0, last = null, ref = null;
+    stream.forEach(s => {
+      if (s.hz == null || !s.pr) { last = null; return; }
+      if (last && s.t - last.t < 300) { dist += Math.hypot(s.hx - last.hx, s.hy - last.hy, s.hz - last.hz); rot += Math.hypot(s.yaw - last.yaw, s.pitch - last.pitch); }
+      if (!ref || s.t - ref.t > 500) { if (ref && Math.hypot(s.hx - ref.hx, s.hy - ref.hy, s.hz - ref.hz) > 1.5) events++; ref = s; }
+      last = s;
+    });
+    const min = stream.length ? (stream[stream.length - 1].t - stream[0].t) / 60000 : 0;
+    return { cmPerMin: min ? dist / min : NaN, degPerMin: min ? rot / min : NaN, movesPerMin: min ? events / min : NaN };
+  }
+  function blinks(stream) {
+    let n = 0, on = null;
+    stream.forEach(s => { if (!s.pr) return; if (s.bl && on == null) on = s.t; if (!s.bl && on != null) { const d = s.t - on; if (d >= 40 && d <= 600) n++; on = null; } });
+    const min = stream.length ? (stream[stream.length - 1].t - stream[0].t) / 60000 : 0;
+    return { perMin: min ? n / min : NaN, count: n };
+  }
+  // よそ見（画面を 向いていない 時間が 1びょう いじょう つづいた 回数・時間）
+  function lookAways(stream, minMs) {
+    minMs = minMs || 1000;
+    const eps = []; let st = null;
+    stream.forEach((s, i) => {
+      const off = !s.f;
+      if (off && st == null) st = s.t;
+      if ((!off || i === stream.length - 1) && st != null) { const d = s.t - st; if (d >= minMs) eps.push(d); st = null; }
+    });
+    return { count: eps.length, totalMs: eps.reduce((a, b) => a + b, 0), longestMs: eps.length ? Math.max.apply(null, eps) : 0 };
+  }
+  function attention(stream) {
+    const n = stream.length || 1;
+    const facingPct = stream.filter(s => s.f).length / n * 100;
+    const pres = stream.filter(s => s.pr).length / n * 100;
+    const g = stream.filter(s => s.g);
+    const onScreen = g.length ? g.filter(s => s.x >= -0.05 && s.x <= 1.05 && s.y >= -0.05 && s.y <= 1.05).length / n * 100 : NaN;
+    return { facingPct, presentPct: pres, onScreenPct: onScreen };
+  }
+  // 注視（I-DT 法：ばらつきが 小さい まとまり）
+  function fixations(stream, opt) {
+    opt = opt || {};
+    const disp = opt.disp || 0.07, minDur = opt.minDur || 120;
+    const g = stream.filter(s => s.g && !s.bl);
+    const out = []; let i = 0;
+    while (i < g.length) {
+      let j = i;
+      while (j + 1 < g.length && g[j + 1].t - g[i].t < minDur) j++;
+      if (j + 1 >= g.length) break;
+      const win = g.slice(i, j + 1);
+      const D = w => (Math.max.apply(null, w.map(s => s.x)) - Math.min.apply(null, w.map(s => s.x))) + (Math.max.apply(null, w.map(s => s.y)) - Math.min.apply(null, w.map(s => s.y)));
+      if (D(win) <= disp) {
+        while (j + 1 < g.length && g[j + 1].t - g[j].t < 300 && D(g.slice(i, j + 2)) <= disp) j++;
+        const w2 = g.slice(i, j + 1);
+        out.push({ t: w2[0].t, dur: w2[w2.length - 1].t - w2[0].t, x: mean(w2.map(s => s.x)), y: mean(w2.map(s => s.y)) });
+        i = j + 1;
+      } else i++;
+    }
+    return out;
+  }
+  function gazeSpread(stream) { const g = stream.filter(s => s.g && !s.bl); return { sx: sd(g.map(s => s.x)), sy: sd(g.map(s => s.y)) }; }
+  // 時間を 4つに わけて（前半と 後半の ちがい ＝ 集中の つづき）
+  function quarters(stream, fn) {
+    if (!stream.length) return [];
+    const t0 = stream[0].t, T = stream[stream.length - 1].t - t0;
+    return [0, 1, 2, 3].map(q => fn(stream.filter(s => s.t - t0 >= T * q / 4 && s.t - t0 < T * (q + 1) / 4 + (q === 3 ? 1 : 0))));
+  }
+  // ヒートマップ（gw×gh の ます、ガウスで ぼかす）
+  function heatGrid(points, gw, gh, sigma) {
+    const g = new Float32Array(gw * gh);
+    const s2 = 2 * sigma * sigma, R = Math.ceil(sigma * 2.5);
+    points.forEach(p => {
+      const cx = p.x * gw, cy = p.y * gh, w = p.w || 1;
+      for (let y = Math.max(0, Math.floor(cy - R)); y < Math.min(gh, Math.ceil(cy + R)); y++)
+        for (let x = Math.max(0, Math.floor(cx - R)); x < Math.min(gw, Math.ceil(cx + R)); x++) g[y * gw + x] += w * Math.exp(-((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2) / s2);
+    });
+    let mx = 0; g.forEach(v => { if (v > mx) mx = v; });
+    if (mx > 0) for (let i = 0; i < g.length; i++) g[i] /= mx;
+    return g;
+  }
+  // 3×3 の ばしょ ごとの 見た 時間（％）と はじめて 見るまでの 時間
+  function aoiGrid(stream, n) {
+    n = n || 3;
+    const g = stream.filter(s => s.g && !s.bl && s.x >= 0 && s.x <= 1 && s.y >= 0 && s.y <= 1);
+    const cells = Array.from({ length: n * n }, () => ({ n: 0, first: null }));
+    const t0 = stream.length ? stream[0].t : 0;
+    g.forEach(s => { const k = Math.min(n - 1, Math.floor(s.y * n)) * n + Math.min(n - 1, Math.floor(s.x * n)); cells[k].n++; if (cells[k].first == null) cells[k].first = s.t - t0; });
+    const tot = g.length || 1;
+    return cells.map(c => ({ pct: c.n / tot * 100, firstMs: c.first }));
+  }
+
+  /* ---------- しゅうちゅう チャレンジ（Go/No-Go） ----------
+     trials: [{ type:'go'|'nogo', on(ms), rts:[ms…] }] */
+  function cptScore(trials) {
+    const go = trials.filter(t => t.type === 'go'), ng = trials.filter(t => t.type === 'nogo');
+    const rt = [], ant = [];
+    let hit = 0, om = 0, com = 0;
+    go.forEach(t => { const r = (t.rts || []).find(x => x >= 150); if ((t.rts || []).some(x => x < 150)) ant.push(t); if (r != null) { hit++; rt.push(r); } else om++; });
+    ng.forEach(t => { if ((t.rts || []).length) com++; });
+    return {
+      go: go.length, nogo: ng.length, hits: hit,
+      omissionPct: go.length ? om / go.length * 100 : NaN,      // 見のがし（不注意の めやす）
+      commissionPct: ng.length ? com / ng.length * 100 : NaN,   // おしまちがい（衝動性の めやす）
+      anticipations: ant.length,
+      rtMean: mean(rt), rtSd: sd(rt), rtCv: rt.length > 2 ? sd(rt) / mean(rt) : NaN   // 反応の ばらつき
+    };
+  }
+
+  /* ---------- みくらべ（どっちを 見る？） ----------
+     trial: { cat, leftKey, rightKey, stream }。 x<0.45 → 左、x>0.55 → 右 */
+  function lookPair(stream) {
+    let L = 0, Rr = 0, first = null, firstMs = null, sw = 0, last = null;
+    const t0 = stream.length ? stream[0].t : 0;
+    for (let i = 1; i < stream.length; i++) {
+      const s = stream[i], dt = Math.min(100, s.t - stream[i - 1].t);
+      if (!s.g || s.bl) continue;
+      const side = s.x < 0.45 ? 'L' : s.x > 0.55 ? 'R' : null;
+      if (!side) continue;
+      if (side === 'L') L += dt; else Rr += dt;
+      if (!first) { first = side; firstMs = s.t - t0; }
+      if (last && last !== side) sw++;
+      last = side;
+    }
+    return { L, R: Rr, first, firstMs, switches: sw };
+  }
+  // カテゴリごと：A を 見た わりあい（A/(A+B)）
+  function pairSummary(trials) {
+    const cats = {};
+    trials.forEach(tr => {
+      const r = lookPair(tr.stream);
+      const a = tr.aSide === 'L' ? r.L : r.R, b = tr.aSide === 'L' ? r.R : r.L;
+      const c = cats[tr.cat] = cats[tr.cat] || { cat: tr.cat, a: 0, b: 0, firstA: 0, firstN: 0, trials: 0 };
+      c.a += a; c.b += b; c.trials++;
+      if (r.first) { c.firstN++; if ((r.first === 'L') === (tr.aSide === 'L')) c.firstA++; }
+    });
+    return Object.values(cats).map(c => ({ cat: c.cat, aPct: c.a + c.b ? c.a / (c.a + c.b) * 100 : NaN, lookMs: c.a + c.b, firstAPct: c.firstN ? c.firstA / c.firstN * 100 : NaN, trials: c.trials }));
+  }
+
+  const api = { faceFeatures, facing, headPose, gazeVec, fitCalib, predict, validate, Smoother, headMotion, blinks, lookAways, attention, fixations, gazeSpread, quarters, heatGrid, aoiGrid, cptScore, lookPair, pairSummary, mean, sd, median };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.ML = api;
+})(typeof window !== 'undefined' ? window : this);
+function jaSay(t) {
+  // 読み上げで 単語の あたまの「は」「へ」が 助詞（わ・え）と 読まれないように カタカナに する（はこ→ハこ、へや→ヘや）
+  return String(t == null ? '' : t).replace(/なかまはずれ/g, '仲間外れ').replace(/(^|[\s、。！？!?・（(「『])([はへ])(?=[\u3041-\u3096\u30A1-\u30FA\u30FC\u4E00-\u9FFF])/g, function (m, a, c) { return a + (c === 'は' ? 'ハ' : 'ヘ'); });
+}
+
+</script>
+<script>
+(function () {
+  'use strict';
+  /* ============================================================
+     小さな道具
+     ============================================================ */
+  const $ = s => document.querySelector(s);
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const shuffle = a => { const r = a.slice(); for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; };
+  const r1 = v => Math.round(v * 10) / 10, r3 = v => Math.round(v * 1000) / 1000;
+  const fmtDate = t => new Date(t).toLocaleString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  function h(tag, props) {
+    const el = document.createElement(tag);
+    if (props) Object.keys(props).forEach(k => {
+      const v = props[k]; if (v === null || v === undefined || v === false) return;
+      if (k === 'class') el.className = v; else if (k === 'html') el.innerHTML = v; else if (k === 'style') el.style.cssText = v; else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v); else el.setAttribute(k, v === true ? '' : v);
+    });
+    (function add(list) { list.forEach(c => { if (c === null || c === undefined || c === false || c === '') return; if (Array.isArray(c)) add(c); else el.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c); }); })(Array.prototype.slice.call(arguments, 2));
+    return el;
+  }
+  let toastT = null;
+  function toast(msg, ms) { const o = $('.toast'); if (o) o.remove(); const t = h('div', { class: 'toast' }, msg); document.body.appendChild(t); clearTimeout(toastT); toastT = setTimeout(() => t.remove(), ms || 2400); }
+
+  /* ============================================================
+     せってい
+     ============================================================ */
+  const ST_KEY = 'mieel-manazashi-st';
+  const st = Object.assign({ kid: '', calPts: 9, cptMin: 3, cptMode: 'tap', cptPair: 0, pairSec: 5, pairCats: ['face', 'move', 'color', 'moji', 'kira', 'many'], viewSec: 20, sound: true, debug: false, preview: true }, (() => { try { return JSON.parse(localStorage.getItem(ST_KEY) || '{}'); } catch (e) { return {}; } })());
+  const saveSt = () => { try { localStorage.setItem(ST_KEY, JSON.stringify(st)); } catch (e) { /* 無視 */ } };
+
+  /* ============================================================
+     ほぞん（IndexedDB・この 端末の 中だけ）
+     ============================================================ */
+  const DB = {
+    db: null,
+    open() { if (this.db) return Promise.resolve(this.db); return new Promise((res, rej) => { const r = indexedDB.open('mieel-manazashi', 1); r.onupgradeneeded = () => { const d = r.result; ['kids', 'sessions', 'images', 'calibs'].forEach(n => d.createObjectStore(n, { keyPath: 'id' })); }; r.onsuccess = () => { this.db = r.result; res(this.db); }; r.onerror = () => rej(r.error); }); },
+    async all(store) { const d = await this.open(); return new Promise((res, rej) => { const q = d.transaction(store).objectStore(store).getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => rej(q.error); }); },
+    async get(store, id) { const d = await this.open(); return new Promise((res, rej) => { const q = d.transaction(store).objectStore(store).get(id); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); },
+    async put(store, v) { const d = await this.open(); return new Promise((res, rej) => { const tx = d.transaction(store, 'readwrite'); tx.objectStore(store).put(v); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); },
+    async del(store, id) { const d = await this.open(); return new Promise((res, rej) => { const tx = d.transaction(store, 'readwrite'); tx.objectStore(store).delete(id); tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error); }); }
+  };
+  let KIDS = [];
+  const kidOf = id => KIDS.find(k => k.id === id);
+  const curKid = () => kidOf(st.kid);
+
+  /* ============================================================
+     音
+     ============================================================ */
+  let ac = null;
+  function A() { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); return ac; } catch (e) { return null; } }
+  function tone(f, t0, dur, vol, type) { if (!st.sound) return; const a = A(); if (!a) return; const t = a.currentTime + t0, o = a.createOscillator(), g = a.createGain(); o.type = type || 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol || 0.12, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.05); }
+  const SND = { pop: () => { tone(880, 0, 0.12); tone(1175, 0.08, 0.15); }, soft: () => tone(660, 0, 0.18, 0.08), ding: () => { tone(988, 0, 0.2, 0.1); tone(1319, 0.12, 0.3, 0.1); } };
+  const canSpeak = 'speechSynthesis' in window; let jaVoice = null;
+  function loadVoice() { if (!canSpeak) return; const v = speechSynthesis.getVoices().filter(x => /^ja/i.test(x.lang)); jaVoice = v.find(x => /Kyoko|O-ren|Otoya/i.test(x.name)) || v[0] || null; }
+  function say(t) { if (!canSpeak || !st.sound || !t) return; try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(jaSay(t)); u.lang = 'ja-JP'; u.rate = 0.95; if (jaVoice) u.voice = jaVoice; speechSynthesis.speak(u); } catch (e) { /* 無視 */ } }
+
+  /* ============================================================
+     カメラ と 顔の 読みとり
+     ============================================================ */
+  const video = $('#video');
+  const timeout = (pr, ms, name) => Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error(name)), ms))]);
+  const V = { ready: false, loading: null, face: null, stream: null, step: '', lastVT: -1, lastT: 0, running: false, onFrame: null, fps: 0 };
+  function loadVision() {
+    if (V.ready) return Promise.resolve();
+    if (V.loading) return V.loading;
+    V.loading = (async () => {
+      V.step = 'ぶひん（1/2）';
+      const mp = await import(new URL('vendor/vision_bundle.js', location.href).href);
+      const fs = await mp.FilesetResolver.forVisionTasks(new URL('vendor/wasm', location.href).href);
+      const mk = async delegate => {
+        V.step = '顔の モデル（2/2）' + (delegate === 'CPU' ? '・CPU' : '');
+        V.face = await mp.FaceLandmarker.createFromOptions(fs, { baseOptions: { modelAssetPath: new URL('vendor/models/face_landmarker.task', location.href).href, delegate }, runningMode: 'VIDEO', numFaces: 1, outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true, minFaceDetectionConfidence: 0.5, minFacePresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+      };
+      try { await timeout(mk('GPU'), 25000, 'gpu-timeout'); V.delegate = 'GPU'; } catch (e) { console.warn(e); V.gpuErr = String(e && e.message || e); await mk('CPU'); V.delegate = 'CPU'; }
+      V.ready = true;
+    })();
+    V.loading.catch(() => { V.loading = null; });
+    return V.loading;
+  }
+  async function startCam() {
+    if (V.stream) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('nocam');
+    V.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } } });
+    video.srcObject = V.stream;
+    await timeout(video.play(), 5000, 'play').catch(() => {});
+  }
+  function stopCam() { V.running = false; V.onFrame = null; if (V.stream) { V.stream.getTracks().forEach(t => t.stop()); V.stream = null; } video.srcObject = null; video.className = ''; document.body.appendChild(video); releaseWake(); }
+  // 毎コマ：顔の 特徴 f（なければ null）を わたす
+  function runFace(onFrame) {
+    V.onFrame = onFrame;
+    if (V.running) return; V.running = true; V.lastVT = -1;
+    const step = () => {
+      if (!V.running) return;
+      requestAnimationFrame(step);
+      if (!V.ready || video.readyState < 2 || !video.videoWidth || video.currentTime === V.lastVT) return;
+      V.lastVT = video.currentTime;
+      let t = performance.now(); if (t <= V.lastT) t = V.lastT + 1;
+      const dt = t - V.lastT; V.lastT = t; if (dt < 500) V.fps = V.fps * 0.9 + 100 / dt;
+      let f = null;
+      try {
+        const r = V.face.detectForVideo(video, t);
+        if (r.faceLandmarks && r.faceLandmarks[0]) f = ML.faceFeatures(r.faceLandmarks[0], video.videoWidth, video.videoHeight, r.facialTransformationMatrixes && r.facialTransformationMatrixes[0] && r.facialTransformationMatrixes[0].data, r.faceBlendshapes && r.faceBlendshapes[0] && r.faceBlendshapes[0].categories);
+      } catch (e) { console.warn(e); }
+      if (V.onFrame) V.onFrame(f, t);
+    };
+    requestAnimationFrame(step);
+  }
+  let wake = null;
+  async function keepAwake() { try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch (e) { /* 無視 */ } }
+  function releaseWake() { try { if (wake) wake.release(); } catch (e) { /* 無視 */ } wake = null; }
+
+  /* ============================================================
+     全画面の ステージ（課題・キャリブレーション 共通）
+     ============================================================ */
+  const main = $('#main');
+  let leave = null, cur = 'home';
+  function go(fn, arg) {
+    if (leave) { try { leave(); } catch (e) { /* 無視 */ } leave = null; }
+    document.body.classList.remove('playing');
+    main.innerHTML = ''; window.scrollTo(0, 0);
+    $('#homeBtn').hidden = fn === renderHome;
+    fn(arg);
+  }
+  // ステージを つくって カメラを じゅんびする。ok なら { stage, cv, g, center, pv, setPv, fit } を かえす
+  async function openStage(opt) {
+    opt = opt || {};
+    document.body.classList.add('playing');
+    const cv = h('canvas');
+    const center = h('div', { class: 'center' });
+    const quit = h('button', { class: 'quit', type: 'button' }, h('i'), h('span', null, '✕ やめる（ながおし）'));
+    const pvSt = h('div', { class: 'st' }, '');
+    const pv = h('div', { class: 'pv' }, pvSt);
+    const loading = h('div', { class: 'loading' }, h('div', null, h('span', { class: 'emo' }, '📷'), h('span', { class: 'lt' }, 'カメラを ひらいています…')));
+    const dbg = h('div', { class: 'dbg' });
+    const stage = h('div', { class: 'stage' }, cv, center, pv, quit, dbg, loading);
+    main.appendChild(h('section', { class: 'screen' }, stage));
+    let qt = null; const qc = () => { clearTimeout(qt); quit.classList.remove('pressing'); };
+    quit.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); quit.classList.add('pressing'); qt = setTimeout(() => { qc(); (opt.onQuit || (() => go(renderHome)))(); }, 1500); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => quit.addEventListener(ev, qc));
+    const fail = (title, detail) => { loading.innerHTML = ''; loading.append(h('div', null, h('span', { class: 'emo' }, '🙈'), title, h('small', { style: 'display:block;font-size:14px;margin-top:6px' }, detail), h('div', { class: 'row', style: 'justify-content:center;margin-top:12px' }, h('button', { class: 'pill', type: 'button', onclick: () => go(renderHome) }, '🏠 もどる')))); };
+    try { await timeout(startCam(), 20000, 'camtimeout'); }
+    catch (e) { const m = String(e && (e.name + ' ' + e.message) || e); fail(/NotAllowed|Permission|Security/i.test(m) ? 'カメラを つかう ことが ゆるされていません。' : /nocam/.test(m) ? 'この 画面では カメラが つかえません。' : 'カメラを ひらけませんでした。', /NotAllowed|Permission/i.test(m) ? 'iPad の「設定」→「アプリ」→「Safari」→「カメラ」を「確認」か「許可」に して、ひらきなおしてください。' : m); return null; }
+    if (!stage.isConnected) return null;
+    video.className = 'shown'; pv.insertBefore(video, pv.firstChild); video.play().catch(() => {});
+    pv.hidden = !st.preview && !opt.showPv;
+    const tick = setInterval(() => { const el = loading.querySelector('.lt'); if (el) el.textContent = '顔の 読みとりを じゅんび ちゅう：' + (V.step || '…'); }, 300);
+    try { await timeout(loadVision(), 120000, 'visiontimeout'); } catch (e) { clearInterval(tick); fail('読みとりの じゅんびが できませんでした。', (V.step || '') + ' / ' + (e && e.message)); return null; }
+    clearInterval(tick);
+    if (!stage.isConnected) return null;
+    loading.hidden = true; keepAwake();
+    const g = cv.getContext('2d');
+    const fit = () => { const d = Math.min(2, window.devicePixelRatio || 1), r = stage.getBoundingClientRect(); const W = Math.round(r.width), H = Math.round(r.height); if (cv.width !== W * d || cv.height !== H * d) { cv.width = W * d; cv.height = H * d; } g.setTransform(d, 0, 0, d, 0, 0); return { W, H }; };
+    const setPv = (txt, ok) => { pvSt.textContent = txt; pvSt.style.background = ok ? 'rgba(47,158,68,.8)' : 'rgba(224,49,49,.8)'; };
+    return { stage, cv, g, center, pv, setPv, fit, dbg, quit };
+  }
+  // 顔の じょうたいの ことば
+  function faceStatus(f) {
+    if (!f) return ['🙈 顔が みえません', false];
+    const cm = Math.abs(f.hz);
+    if (cm && cm < 28) return ['⬅️ すこし はなれて', false];
+    if (cm && cm > 85) return ['➡️ すこし ちかづいて', false];
+    if (!ML.facing(f)) return ['↩️ 画面の ほうを むいて', false];
+    return ['✅ よい いち（' + Math.round(cm) + 'cm）', true];
+  }
+
+  /* ============================================================
+     キャリブレーション（見ている ばしょを あわせる）
+     ============================================================ */
+  const CAL = {};   // kidId → { cal, quality, at }
+  function calOf(kid) { const c = CAL[kid]; return c && Date.now() - c.at < 45 * 60000 ? c : null; }
+  async function loadCals() { try { (await DB.all('calibs')).forEach(c => { CAL[c.id] = c; }); } catch (e) { /* 無視 */ } }
+  // ひとまとまりの 記録（課題中の 1コマ）
+  function sampleOf(f, t, cal, sm) {
+    const s = { t: Math.round(t), pr: f ? 1 : 0, f: ML.facing(f) ? 1 : 0, g: 0, bl: f && f.blink ? 1 : 0 };
+    if (f) { s.hx = r1(f.hx); s.hy = r1(f.hy); s.hz = r1(f.hz); s.yaw = r1(f.yaw); s.pitch = r1(f.pitch); }
+    if (f && cal && !f.blink) { const p = sm.push(ML.predict(cal, f)); if (p) { s.g = 1; s.x = r3(p.x); s.y = r3(p.y); } }
+    return s;
+  }
+
+  /* ============================================================
+     キャリブレーション
+     ============================================================ */
+  function calPoints(n) {
+    const m = 0.08, a = [m, 0.5, 1 - m];
+    if (n === 3) return [[m, 0.5], [0.5, 0.5], [1 - m, 0.5]];
+    if (n === 5) return [[m, m], [1 - m, m], [0.5, 0.5], [m, 1 - m], [1 - m, 1 - m]];
+    const p = []; a.forEach(y => a.forEach(x => p.push([x, y]))); return p;
+  }
+  const VAL_PTS = n => n === 3 ? [[0.28, 0.5], [0.72, 0.5]] : [[0.3, 0.3], [0.7, 0.3], [0.3, 0.7], [0.7, 0.7]];
+  // then(c)：キャリブレーションが おわったら よぶ（c は null の ことも ある＝しない で すすむ）
+  async function runCalib(then, opt) {
+    opt = opt || {};
+    const S = await openStage({ showPv: true, onQuit: () => go(renderHome) });
+    if (!S) return;
+    const n = opt.points || st.calPts, mode = n === 3 ? 'x' : 'xy';
+    let phase = 'check', f = null, raf = 0, seq = [], k = 0, t0 = 0, samples = [], vals = [], okT = 0;
+    S.pv.style.cssText = 'width:min(420px,60vw);right:50%;transform:translateX(50%);bottom:auto;top:16%';
+    const startBtn = h('button', { class: 'big-btn go', type: 'button', onclick: () => begin() }, '▶ はじめる');
+    S.center.style.cssText = 'justify-content:flex-end;padding-bottom:6vh';
+    S.center.append(h('h2', null, '👀 見る ばしょを あわせます'),
+      h('p', null, '顔が 画面に うつるように して、iPad から 40〜70cm くらい はなれます。', h('br'), '「はじめる」の あと、出てくる ひよこを 目で おいかけて もらいます（' + n + 'か所・やく ' + Math.round(n * 1.7 + 6) + 'びょう）。'),
+      h('div', { class: 'row', style: 'justify-content:center' }, startBtn, opt.skippable ? h('button', { class: 'pill', type: 'button', onclick: () => { cancelAnimationFrame(raf); then(null); } }, 'あわせないで すすむ') : null));
+    runFace((ff, t) => {
+      f = ff;
+      const [txt, ok] = faceStatus(f); S.setPv(txt, ok);
+      if (phase === 'pts' || phase === 'val') {
+        const el = t - t0;
+        if (el > 600 && el < 1500 && f) (phase === 'pts' ? samples : vals).push({ f, tx: seq[k][0], ty: seq[k][1] });
+      }
+    });
+    function begin() {
+      A(); S.center.innerHTML = ''; S.pv.style.cssText = ''; S.pv.hidden = !st.preview;
+      seq = shuffle(calPoints(n)); k = 0; phase = 'pts'; t0 = performance.now(); SND.soft();
+      say('ひよこを みてね');
+      draw();
+    }
+    function draw() {
+      raf = requestAnimationFrame(draw);
+      const { W, H } = S.fit(); const g = S.g;
+      g.clearRect(0, 0, W, H);
+      if (phase !== 'pts' && phase !== 'val') return;
+      const el = performance.now() - t0;
+      if (el > 1650) {
+        k++; t0 = performance.now();
+        if (k >= seq.length) {
+          if (phase === 'pts') { phase = 'val'; seq = VAL_PTS(n).map(p => p.slice()); k = 0; SND.soft(); }
+          else { finish(); return; }
+        } else SND.soft();
+      }
+      const [px, py] = seq[k], x = px * W, y = py * H, p = Math.min(1, (performance.now() - t0) / 1650);
+      window.__calTarget = seq[k];   // テスト用
+      const R = Math.min(W, H) * (0.07 - 0.045 * p);
+      g.fillStyle = phase === 'val' ? 'rgba(12,166,120,.18)' : 'rgba(76,110,245,.16)'; g.beginPath(); g.arc(x, y, R * 2.2, 0, 7); g.fill();
+      g.font = Math.round(R * 2) + 'px ' + 'Apple Color Emoji, Segoe UI Emoji, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(phase === 'val' ? '⭐' : '🐥', x, y + Math.sin(performance.now() / 120) * 3);
+      g.fillStyle = '#212529'; g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill();
+    }
+    function finish() {
+      cancelAnimationFrame(raf); phase = 'done'; V.onFrame = null;
+      const cal = ML.fitCalib(samples, mode);
+      const q = cal ? ML.validate(cal, vals) : { err: 1, grade: 'poor', points: 0 };
+      const { W, H } = S.fit(); S.g.clearRect(0, 0, W, H);
+      const GR = { good: ['✅ よい', '3×3 の ばしょ・ヒートマップまで つかえます'], ok: ['🟡 ふつう', '左右・上下（4つ くらいの ばしょ）の くらべに つかえます'], poor: ['🔴 あらい', '顔の 向きだけを つかいます（視線の ばしょは あてに しない）'] }[q.grade];
+      S.center.style.cssText = '';
+      S.center.innerHTML = '';
+      S.center.append(h('h2', null, '結果：' + GR[0]), h('p', null, GR[1], h('br'), 'ずれ：画面の はばの やく ' + Math.round(q.err * 100) + '%（' + (mode === 'x' ? '左右だけ' : '左右・上下') + '）' + (cal ? '' : '　※ 目の 記録が たりませんでした')),
+        h('div', { class: 'row', style: 'justify-content:center' },
+          h('button', { class: 'big-btn go', type: 'button', disabled: !cal, onclick: async () => { const c = { id: st.kid, cal, quality: q, at: Date.now() }; CAL[st.kid] = c; try { await DB.put('calibs', c); } catch (e) { /* 無視 */ } then(c); } }, '✔ これで つかう'),
+          h('button', { class: 'pill', type: 'button', onclick: () => go(() => runCalib(then, opt)) }, '🔁 もういちど'),
+          opt.skippable ? h('button', { class: 'pill', type: 'button', onclick: () => then(null) }, 'あわせないで すすむ') : null));
+      if (q.grade !== 'poor') SND.ding();
+    }
+    leave = () => { cancelAnimationFrame(raf); stopCam(); };
+  }
+  // 課題の まえ：45分 いないの あわせが あれば つかうか きく
+  function withCalib(need, then) {
+    const c = calOf(st.kid);
+    if (c && (need !== 'xy' || c.cal.mode === 'xy')) {
+      const scr = h('section', { class: 'screen', style: 'align-items:center;justify-content:center;gap:16px;text-align:center' },
+        h('h2', { class: 't' }, '👀 さっきの 「見る ばしょ あわせ」が あります'),
+        h('p', { class: 'help' }, fmtDate(c.at) + '・ずれ やく ' + Math.round(c.quality.err * 100) + '%（' + { good: 'よい', ok: 'ふつう', poor: 'あらい' }[c.quality.grade] + '）', h('br'), 'すわる 場所や iPad の 位置が かわった ときは、あわせなおして ください。'),
+        h('div', { class: 'row', style: 'justify-content:center' }, h('button', { class: 'big-btn go', type: 'button', onclick: () => then(c) }, 'これを つかう'), h('button', { class: 'pill', type: 'button', onclick: () => go(() => runCalib(then, { skippable: need === 'opt', points: need === 'xy' && st.calPts === 3 ? 9 : st.calPts })) }, '🔁 あわせなおす')));
+      main.appendChild(scr); return;
+    }
+    runCalib(then, { skippable: need === 'opt', points: need === 'xy' && st.calPts === 3 ? 9 : need === 'x' ? Math.max(3, st.calPts) : st.calPts });
+  }
+  function needKid() { if (curKid()) return true; toast('さいしょに こどもを えらんで ください'); return false; }
+  // 記録を へらして 保存（1びょう 15コマ くらい）
+  function thin(stream) { const out = []; let last = -1e9; stream.forEach(s => { if (s.t - last >= 60) { out.push(s); last = s.t; } }); return out; }
+  async function saveSession(sess) {
+    sess.id = sess.id || uid(); sess.kid = st.kid; sess.at = sess.at || Date.now();
+    await DB.put('sessions', sess);
+    return sess.id;
+  }
+  function calInfo(c) { return c ? { grade: c.quality.grade, err: r3(c.quality.err), mode: c.cal.mode } : null; }
+
+  /* ============================================================
+     1. どっちを みる？（みくらべ）
+     ============================================================ */
+  const PAIR_CATS = {
+    face: { name: 'かお と もの', a: 'かお', b: 'もの', da: { e: '😊' }, db: { e: '🧸' } },
+    move: { name: 'うごく と とまる', a: 'うごく', b: 'とまる', da: { e: '🐠', move: true }, db: { e: '🐠' } },
+    color: { name: 'あか と あお', a: 'あか', b: 'あお', da: { circle: '#FA5252' }, db: { circle: '#339AF0' } },
+    moji: { name: 'もじ と え', a: 'もじ', b: 'え', da: { text: 'あ' }, db: { e: '🍎' } },
+    kira: { name: 'きらきら と ふつう', a: 'きらきら', b: 'ふつう', da: { e: '⭐', sparkle: true }, db: { e: '⭐' } },
+    many: { name: 'たくさん と ひとつ', a: 'たくさん', b: 'ひとつ', da: { e: '🍬', grid: true }, db: { e: '🍬' } }
+  };
+  const IMGCACHE = {};
+  async function imgOf(id) { if (IMGCACHE[id]) return IMGCACHE[id]; const r = await DB.get('images', id); if (!r) return null; const im = new Image(); im.src = URL.createObjectURL(r.blob); await new Promise(res => { im.onload = res; im.onerror = res; }); IMGCACHE[id] = im; return im; }
+  function drawStim(g, d, x, y, w, hh, t) {
+    const s = Math.min(w, hh);
+    g.save(); g.textAlign = 'center'; g.textBaseline = 'middle';
+    const E = (e, px, py, size) => { g.font = Math.round(size) + 'px Apple Color Emoji, Segoe UI Emoji, sans-serif'; g.fillText(e, px, py); };
+    const cx = x + w / 2, cy = y + hh / 2;
+    if (d.img) { const im = d.img, k = Math.min(w * 0.9 / im.width, hh * 0.9 / im.height); g.drawImage(im, cx - im.width * k / 2, cy - im.height * k / 2, im.width * k, im.height * k); }
+    else if (d.circle) { g.fillStyle = d.circle; g.beginPath(); g.arc(cx, cy, s * 0.3, 0, 7); g.fill(); }
+    else if (d.text) { g.fillStyle = '#212529'; g.font = '800 ' + Math.round(s * 0.5) + 'px "Hiragino Maru Gothic ProN", sans-serif'; g.fillText(d.text, cx, cy); }
+    else if (d.grid) { for (let i = 0; i < 9; i++) E(d.e, cx + ((i % 3) - 1) * s * 0.22, cy + (Math.floor(i / 3) - 1) * s * 0.22, s * 0.15); }
+    else if (d.move) { const a = t / 600; E(d.e, cx + Math.cos(a) * s * 0.18, cy + Math.sin(a * 1.3) * s * 0.12, s * 0.4); }
+    else { E(d.e, cx, cy, s * 0.45); if (d.sparkle) for (let i = 0; i < 8; i++) { const a = i / 8 * 6.28 + t / 900, r = s * (0.3 + 0.05 * Math.sin(t / 150 + i)); g.globalAlpha = 0.5 + 0.5 * Math.sin(t / 120 + i * 2); E('✨', cx + Math.cos(a) * r, cy + Math.sin(a) * r, s * 0.1); } }
+    g.restore();
+  }
+  function renderPairSetup() {
+    if (!needKid()) { go(renderHome); return; }
+    const scr = h('section', { class: 'screen scroll', style: 'gap:12px' });
+    const draw = async () => {
+      scr.innerHTML = '';
+      const customs = (await DB.all('images')).filter(x => x.kind === 'pair');
+      scr.append(h('h2', { class: 't' }, '👀 どっちを みる？（みくらべ）'),
+        h('p', { class: 'help' }, '左右に 2つ ならべて 見せ、どちらを 長く 見たか・さきに 見たかを はかります。その子が「どんな ものに 目が いきやすいか」を さがします（1つの 組を 左右 入れかえて 2回 ずつ）。'),
+        h('div', { class: 'card' }, h('b', null, 'くらべる 組'), h('div', { class: 'row', style: 'margin-top:8px' },
+          Object.keys(PAIR_CATS).map(k => { const on = st.pairCats.includes(k); return h('button', { type: 'button', class: 'pill' + (on ? ' on' : ''), onclick: () => { st.pairCats = on ? st.pairCats.filter(x => x !== k) : st.pairCats.concat(k); saveSt(); draw(); } }, (on ? '✅ ' : '') + PAIR_CATS[k].name); }),
+          customs.map(c => { const k = 'c:' + c.id, on = st.pairCats.includes(k); return h('button', { type: 'button', class: 'pill' + (on ? ' on' : ''), onclick: () => { st.pairCats = on ? st.pairCats.filter(x => x !== k) : st.pairCats.concat(k); saveSt(); draw(); } }, (on ? '✅ ' : '') + '🖼️ ' + c.name); })),
+          h('div', { class: 'row', style: 'margin-top:10px' }, h('button', { class: 'pill', type: 'button', onclick: () => addCustomPair(draw) }, '➕ 写真で 組を つくる'), customs.length ? h('button', { class: 'pill danger', type: 'button', onclick: async () => { const n = prompt('けす 組の なまえ', customs[0].name); const c = customs.find(x => x.name === n); if (c) { await DB.del('images', c.id); await DB.del('images', c.id + ':b'); st.pairCats = st.pairCats.filter(x => x !== 'c:' + c.id); saveSt(); draw(); } } }, '🗑️ 組を けす') : null)),
+        h('div', { class: 'card row' }, h('b', null, '1回の 時間'), h('div', { class: 'seg' }, [3, 5, 8].map(v => h('button', { type: 'button', class: st.pairSec === v ? 'on' : '', onclick: () => { st.pairSec = v; saveSt(); draw(); } }, v + 'びょう')))),
+        h('div', { class: 'row' }, h('button', { class: 'big-btn go', type: 'button', disabled: !st.pairCats.length, onclick: () => go(() => withCalib('x', c => go(() => runPair(c)))) }, '▶ はじめる（やく ' + Math.round(st.pairCats.length * 2 * (st.pairSec + 1.4)) + 'びょう）')));
+    };
+    main.appendChild(scr); draw();
+  }
+  function pickImage() { return new Promise(res => { const fi = $('#fileIn'); fi.accept = 'image/*'; fi.value = ''; fi.onchange = () => res(fi.files && fi.files[0] || null); fi.click(); }); }
+  async function shrinkImage(file, max) {
+    const im = new Image(); im.src = URL.createObjectURL(file); await new Promise(r => { im.onload = r; im.onerror = r; });
+    const k = Math.min(1, (max || 1600) / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+    c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+    return new Promise(r => c.toBlob(b => r(b), 'image/jpeg', 0.85));
+  }
+  async function addCustomPair(done) {
+    const name = prompt('組の なまえ（れい：じぶんの かお と ともだち）'); if (!name) return;
+    const aLabel = prompt('A の なまえ（れい：じぶん）', 'A') || 'A', bLabel = prompt('B の なまえ（れい：ともだち）', 'B') || 'B';
+    toast('A の 写真を えらんで ください'); const fa = await pickImage(); if (!fa) return;
+    toast('B の 写真を えらんで ください'); const fb = await pickImage(); if (!fb) return;
+    const id = uid();
+    await DB.put('images', { id, kind: 'pair', name, aLabel, bLabel, blob: await shrinkImage(fa, 900) });
+    await DB.put('images', { id: id + ':b', kind: 'pairb', blob: await shrinkImage(fb, 900) });
+    st.pairCats.push('c:' + id); saveSt(); done();
+  }
+  async function runPair(calib) {
+    // じゅんび：カテゴリ → 刺激
+    const list = [];
+    for (const k of st.pairCats) {
+      if (k.slice(0, 2) === 'c:') { const id = k.slice(2), meta = await DB.get('images', id); if (!meta) continue; list.push({ cat: k, name: meta.name, a: meta.aLabel, b: meta.bLabel, da: { img: await imgOf(id) }, db: { img: await imgOf(id + ':b') } }); }
+      else if (PAIR_CATS[k]) list.push(Object.assign({ cat: k }, PAIR_CATS[k]));
+    }
+    const trials = shuffle(list.flatMap(c => [Object.assign({}, c, { aSide: 'L' }), Object.assign({}, c, { aSide: 'R' })]));
+    const S = await openStage({ onQuit: () => go(renderHome) });
+    if (!S) return;
+    const cal = calib && calib.cal, sm = new ML.Smoother(0.35);
+    let all = [], i = -1, phase = 'intro', t0 = 0, raf = 0, curStream = null;
+    const out = [];
+    S.center.append(h('h2', null, '🙂 がめんを みてね'), h('p', null, 'いろいろな ものが 出てきます。すきな ほうを みてね。'), h('button', { class: 'big-btn go', type: 'button', onclick: () => { S.center.innerHTML = ''; next(); } }, '▶ スタート'));
+    runFace((f, t) => {
+      const s = sampleOf(f, t, cal, sm); all.push(s);
+      if (phase === 'show' && curStream) curStream.push(s);
+      S.setPv(faceStatus(f)[0], faceStatus(f)[1]);
+    });
+    function next() {
+      if (curStream && i >= 0) out.push({ cat: trials[i].cat, name: trials[i].name, a: trials[i].a, b: trials[i].b, aSide: trials[i].aSide, stream: curStream });
+      i++;
+      if (i >= trials.length) { finish(); return; }
+      phase = 'attn'; t0 = performance.now(); curStream = null; SND.soft();
+    }
+    function draw() {
+      raf = requestAnimationFrame(draw);
+      const { W, H } = S.fit(), g = S.g, now = performance.now(), el = now - t0;
+      g.clearRect(0, 0, W, H);
+      if (phase === 'attn') {
+        g.save(); g.translate(W / 2, H / 2); g.rotate(now / 400); g.font = Math.round(Math.min(W, H) * 0.12) + 'px Apple Color Emoji, Segoe UI Emoji, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('🌟', 0, 0); g.restore();
+        if (el > 1400) { phase = 'show'; t0 = now; curStream = []; }
+      } else if (phase === 'show') {
+        const tr = trials[i], L = tr.aSide === 'L' ? tr.da : tr.db, R = tr.aSide === 'L' ? tr.db : tr.da;
+        window.__pairNow = tr;   // テスト用
+        g.fillStyle = '#F1F3F5'; g.fillRect(W / 2 - 1, H * 0.1, 2, H * 0.8);
+        drawStim(g, L, 0, 0, W / 2, H, now); drawStim(g, R, W / 2, 0, W / 2, H, now);
+        if (el > st.pairSec * 1000) next();
+      }
+      if (st.debug && all.length) { const s = all[all.length - 1]; if (s.g) { g.fillStyle = 'rgba(224,49,49,.5)'; g.beginPath(); g.arc(s.x * W, s.y * H, 14, 0, 7); g.fill(); } S.dbg.textContent = Math.round(V.fps) + 'fps'; }
+    }
+    raf = requestAnimationFrame(draw);
+    async function finish() {
+      cancelAnimationFrame(raf); V.onFrame = null;
+      const id = await saveSession({ task: 'pair', dur: all.length ? Math.round((all[all.length - 1].t - all[0].t) / 1000) : 0, cal: calInfo(calib), stream: thin(all), trials: out.map(o => Object.assign({}, o, { stream: thin(o.stream) })) });
+      go(renderSession, id);
+    }
+    leave = () => { cancelAnimationFrame(raf); stopCam(); };
+  }
+
+  /* ============================================================
+     2. しゅうちゅう チャレンジ（Go/No-Go ＋ 頭の 動き）
+     ============================================================ */
+  const CPT_PAIRS = [{ go: '🐶', no: '🐱', goN: 'いぬ', noN: 'ねこ' }, { go: '⭐', no: '🌙', goN: 'ほし', noN: 'つき' }, { go: '🍎', no: '🍌', goN: 'りんご', noN: 'バナナ' }];
+  function renderCptSetup() {
+    if (!needKid()) { go(renderHome); return; }
+    const scr = h('section', { class: 'screen scroll', style: 'gap:12px' });
+    const draw = () => {
+      scr.innerHTML = '';
+      const P = CPT_PAIRS[st.cptPair] || CPT_PAIRS[0];
+      scr.append(h('h2', { class: 't' }, '⭐ しゅうちゅう チャレンジ'),
+        h('p', { class: 'help' }, P.go + 'が 出たら 画面を タッチ、' + P.no + 'の ときは タッチしない 課題（Go/No-Go 型の 持続的注意課題）。とちゅうの 頭の 動き・画面から 目が それた 時間も はかります。'),
+        h('div', { class: 'card', style: 'display:flex;flex-direction:column;gap:10px' },
+          h('div', { class: 'row' }, h('b', null, 'じかん'), h('div', { class: 'seg' }, [2, 3, 5].map(v => h('button', { type: 'button', class: st.cptMin === v ? 'on' : '', onclick: () => { st.cptMin = v; saveSt(); draw(); } }, v + 'ふん')))),
+          h('div', { class: 'row' }, h('b', null, 'やりかた'), h('div', { class: 'seg' }, [['tap', '👆 タッチする'], ['watch', '👀 みるだけ']].map(([v, t]) => h('button', { type: 'button', class: st.cptMode === v ? 'on' : '', onclick: () => { st.cptMode = v; saveSt(); draw(); } }, t))), h('small', { class: 'help' }, 'タッチが むずかしい 子は「みるだけ」（画面を 見つづける 力・頭の 動き だけ はかる）')),
+          h('div', { class: 'row' }, h('b', null, 'えがら'), h('div', { class: 'seg' }, CPT_PAIRS.map((p, i) => h('button', { type: 'button', class: st.cptPair === i ? 'on' : '', onclick: () => { st.cptPair = i; saveSt(); draw(); } }, p.go + ' / ' + p.no))))),
+        h('p', { class: 'help' }, '見る ばしょ あわせ は しなくても できます（すると「画面の まんなかを 見ていたか」も わかります）。'),
+        h('div', { class: 'row' }, h('button', { class: 'big-btn go', type: 'button', onclick: () => go(() => withCalib('opt', c => go(() => runCpt(c)))) }, '▶ はじめる')));
+    };
+    main.appendChild(scr); draw();
+  }
+  async function runCpt(calib) {
+    const P = CPT_PAIRS[st.cptPair] || CPT_PAIRS[0], tap = st.cptMode === 'tap';
+    const S = await openStage({ onQuit: () => finish(true) });
+    if (!S) return;
+    const cal = calib && calib.cal, sm = new ML.Smoother(0.35);
+    let phase = 'intro', all = [], trials = [], curT = null, raf = 0, endAt = 0, nextAt = 0, practice = [], pi = 0, fb = null;
+    const STIM = 800;
+    runFace((f, t) => { const s = sampleOf(f, t, cal, sm); if (phase === 'main') all.push(s); S.setPv(faceStatus(f)[0], faceStatus(f)[1]); });
+    S.center.append(h('h2', null, tap ? P.go + ' が でたら タッチ！' : P.go + ' と ' + P.no + ' を みてね'),
+      h('p', null, tap ? P.no + ' の ときは タッチ しないでね。さいしょに れんしゅう します。' : 'がめんの まんなかを みていてね。'),
+      h('div', { style: 'font-size:90px', class: 'emo' }, P.go + ' 👆　' + (tap ? P.no + ' ✋' : P.no)),
+      h('button', { class: 'big-btn go', type: 'button', onclick: e => { e.stopPropagation(); S.center.innerHTML = ''; say(tap ? P.goN + ' が でたら タッチ' : 'がめんを みててね'); if (tap) { phase = 'prac'; practice = shuffle(['go', 'go', 'nogo', 'go', 'nogo']); pi = 0; nextAt = performance.now() + 1200; } else startMain(); } }, '▶ スタート'));
+    function startMain() { phase = 'main'; all = []; trials = []; endAt = performance.now() + st.cptMin * 60000; nextAt = performance.now() + 1500; say('はじめ'); }
+    // タッチ
+    S.stage.addEventListener('pointerdown', e => {
+      if (!tap || e.target.closest('.quit,button')) return;
+      const now = performance.now();
+      if (curT && now >= curT.on) { curT.rts.push(Math.round(now - curT.on)); if (phase === 'prac') fb = { ok: curT.type === 'go', at: now }; else SND.soft(); }
+    });
+    function newTrial(type) { curT = { type, on: performance.now(), rts: [] }; window.__cptCur = curT; return curT; }
+    function draw() {
+      raf = requestAnimationFrame(draw);
+      const { W, H } = S.fit(), g = S.g, now = performance.now();
+      g.clearRect(0, 0, W, H);
+      if (phase === 'prac' || phase === 'main') {
+        if (now >= nextAt) {
+          if (curT && phase === 'prac' && !curT.rts.length && curT.type === 'go') fb = { ok: false, miss: true, at: now };
+          if (curT && phase === 'prac' && !curT.rts.length && curT.type === 'nogo') fb = { ok: true, at: now };
+          if (phase === 'prac') {
+            if (pi >= practice.length) { curT = null; phase = 'ready'; S.center.append(h('h2', null, 'じょうず！ ほんばん だよ'), h('button', { class: 'big-btn go', type: 'button', onclick: e => { e.stopPropagation(); S.center.innerHTML = ''; startMain(); } }, '▶ ほんばん')); return; }
+            newTrial(practice[pi++]);
+          } else {
+            if (now >= endAt) { finish(false); return; }
+            trials.push(newTrial(Math.random() < 0.75 ? 'go' : 'nogo'));
+          }
+          nextAt = now + STIM + rnd(1000, 2000);
+        }
+        // 刺激（STIM ms）・まんなかの ＋
+        if (curT && now - curT.on < STIM) { g.font = Math.round(Math.min(W, H) * 0.3) + 'px Apple Color Emoji, Segoe UI Emoji, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(curT.type === 'go' ? P.go : P.no, W / 2, H / 2); }
+        else { g.strokeStyle = '#ADB5BD'; g.lineWidth = 4; g.beginPath(); g.moveTo(W / 2 - 14, H / 2); g.lineTo(W / 2 + 14, H / 2); g.moveTo(W / 2, H / 2 - 14); g.lineTo(W / 2, H / 2 + 14); g.stroke(); }
+        if (fb && now - fb.at < 900) { g.font = '800 40px sans-serif'; g.textAlign = 'center'; g.fillStyle = fb.ok ? '#2F9E44' : '#E8590C'; g.fillText(fb.ok ? '⭕ いいね' : fb.miss ? (P.go + ' は タッチ！') : (P.no + ' は タッチ しないよ'), W / 2, H * 0.18); }
+        if (phase === 'main') { const p = 1 - (endAt - now) / (st.cptMin * 60000); g.fillStyle = '#E9ECEF'; g.fillRect(0, H - 6, W, 6); g.fillStyle = '#74C0FC'; g.fillRect(0, H - 6, W * clamp(p, 0, 1), 6); }
+      }
+      if (st.debug) S.dbg.textContent = Math.round(V.fps) + 'fps ' + trials.length;
+    }
+    raf = requestAnimationFrame(draw);
+    let done = false;
+    async function finish(early) {
+      if (done) return; done = true; cancelAnimationFrame(raf); V.onFrame = null;
+      if (phase !== 'main' || all.length < 30) { go(renderHome); return; }
+      SND.ding(); say('おしまい。がんばったね');
+      const t0 = all[0].t;
+      const id = await saveSession({ task: 'cpt', mode: st.cptMode, pair: P.go + P.no, early: !!early, dur: Math.round((all[all.length - 1].t - t0) / 1000), cal: calInfo(calib), stream: thin(all), trials: trials.map(t => ({ type: t.type, on: Math.round(t.on - (performance.timeOrigin ? 0 : 0)), rts: t.rts })) });
+      go(renderSession, id);
+    }
+    leave = () => { cancelAnimationFrame(raf); stopCam(); };
+  }
+
+  /* ============================================================
+     3. きょうざいを みる（どこを 見たか ヒートマップ）
+     ============================================================ */
+  function renderViewSetup() {
+    if (!needKid()) { go(renderHome); return; }
+    const scr = h('section', { class: 'screen scroll', style: 'gap:12px' });
+    const draw = async () => {
+      scr.innerHTML = '';
+      const imgs = (await DB.all('images')).filter(x => x.kind === 'view').sort((a, b) => b.at - a.at);
+      scr.append(h('h2', { class: 't' }, '🖼️ きょうざいを みる'),
+        h('p', { class: 'help' }, 'プリントや 絵本・教材の 写真を 画面いっぱいに 見せて、どこを 見たかを ヒートマップに します。「どの 刺激に ひきつけられやすいか」「見てほしい ところを 見ているか」の 手がかりに。（見る ばしょ あわせ が「よい」か「ふつう」の ときに つかえます）'),
+        h('div', { class: 'card', style: 'display:flex;flex-direction:column;gap:10px' },
+          h('div', { class: 'row' }, h('button', { class: 'pill', type: 'button', onclick: async () => { const f = await pickImage(); if (!f) return; const name = prompt('きょうざいの なまえ', f.name.replace(/\.[^.]+$/, '')) || 'きょうざい'; await DB.put('images', { id: uid(), kind: 'view', name, at: Date.now(), blob: await shrinkImage(f, 1800) }); draw(); } }, '➕ 写真・画像を くわえる')),
+          imgs.length ? h('div', { class: 'row' }, imgs.map(im => { const on = st.viewImg === im.id; const th = h('img', { style: 'width:120px;height:90px;object-fit:cover;border-radius:10px;display:block' }); th.src = URL.createObjectURL(im.blob); return h('button', { type: 'button', class: 'pill' + (on ? ' on' : ''), style: 'flex-direction:column;padding:6px;height:auto', onclick: () => { st.viewImg = im.id; saveSt(); draw(); } }, th, im.name); })) : h('p', { class: 'help' }, 'まだ 画像が ありません'),
+          imgs.length ? h('div', { class: 'row' }, h('button', { class: 'pill danger', type: 'button', onclick: async () => { if (!st.viewImg || !confirm('えらんでいる 画像を けしますか？')) return; await DB.del('images', st.viewImg); st.viewImg = ''; saveSt(); draw(); } }, '🗑️ えらんだ 画像を けす')) : null,
+          h('div', { class: 'row' }, h('b', null, '見せる 時間'), h('div', { class: 'seg' }, [10, 20, 30, 60].map(v => h('button', { type: 'button', class: st.viewSec === v ? 'on' : '', onclick: () => { st.viewSec = v; saveSt(); draw(); } }, v + 'びょう'))))),
+        h('div', { class: 'row' }, h('button', { class: 'big-btn go', type: 'button', disabled: !imgs.some(x => x.id === st.viewImg), onclick: () => go(() => withCalib('xy', c => go(() => runView(c)))) }, '▶ はじめる')));
+    };
+    main.appendChild(scr); draw();
+  }
+  async function runView(calib) {
+    const im = await imgOf(st.viewImg), meta = await DB.get('images', st.viewImg);
+    if (!im) { go(renderHome); return; }
+    const S = await openStage({ onQuit: () => finish(true) });
+    if (!S) return;
+    const cal = calib && calib.cal, sm = new ML.Smoother(0.3);
+    let phase = 'intro', all = [], raf = 0, t0 = 0, rect = null;
+    runFace((f, t) => { const s = sampleOf(f, t, cal, sm); if (phase === 'show') all.push(s); S.setPv(faceStatus(f)[0], faceStatus(f)[1]); });
+    S.center.append(h('h2', null, '🙂 がめんを みてね'), h('button', { class: 'big-btn go', type: 'button', onclick: () => { S.center.innerHTML = ''; phase = 'show'; t0 = performance.now(); SND.soft(); } }, '▶ スタート'));
+    function draw() {
+      raf = requestAnimationFrame(draw);
+      const { W, H } = S.fit(), g = S.g;
+      g.clearRect(0, 0, W, H);
+      if (phase !== 'show') return;
+      const k = Math.min(W / im.width, H / im.height); rect = { x: (W - im.width * k) / 2 / W, y: (H - im.height * k) / 2 / H, w: im.width * k / W, h: im.height * k / H };
+      g.drawImage(im, rect.x * W, rect.y * H, rect.w * W, rect.h * H);
+      const p = (performance.now() - t0) / (st.viewSec * 1000);
+      g.fillStyle = '#E9ECEF'; g.fillRect(0, H - 5, W, 5); g.fillStyle = '#74C0FC'; g.fillRect(0, H - 5, W * clamp(p, 0, 1), 5);
+      if (st.debug && all.length) { const s = all[all.length - 1]; if (s.g) { g.fillStyle = 'rgba(224,49,49,.5)'; g.beginPath(); g.arc(s.x * W, s.y * H, 14, 0, 7); g.fill(); } }
+      if (p >= 1) finish(false);
+    }
+    raf = requestAnimationFrame(draw);
+    let done = false;
+    async function finish(early) {
+      if (done) return; done = true; cancelAnimationFrame(raf); V.onFrame = null;
+      if (all.length < 20) { go(renderHome); return; }
+      SND.ding();
+      const id = await saveSession({ task: 'view', imgId: st.viewImg, imgName: meta ? meta.name : '', rect, early: !!early, dur: Math.round((all[all.length - 1].t - all[0].t) / 1000), cal: calInfo(calib), stream: thin(all) });
+      go(renderSession, id);
+    }
+    leave = () => { cancelAnimationFrame(raf); stopCam(); };
+  }
+
+  /* ============================================================
+     レポート
+     ============================================================ */
+  const TASKS = { pair: { e: '👀', name: 'どっちを みる？' }, cpt: { e: '⭐', name: 'しゅうちゅう チャレンジ' }, view: { e: '🖼️', name: 'きょうざいを みる' } };
+  const GRADE = { good: 'よい', ok: 'ふつう', poor: 'あらい' };
+  const fmt = (v, d) => (v == null || isNaN(v)) ? '―' : (d ? v.toFixed(d) : String(Math.round(v)));
+  // 1つの 記録から 共通の 指標を 計算
+  function metricsOf(s) {
+    const S = s.stream || [];
+    const a = ML.attention(S), hm = ML.headMotion(S), bl = ML.blinks(S), la = ML.lookAways(S, 1000), sp = ML.gazeSpread(S);
+    const m = { facing: a.facingPct, present: a.presentPct, onScreen: a.onScreenPct, lookAway: la.count, lookAwayMs: la.totalMs, longestAway: la.longestMs, headCm: hm.cmPerMin, headMoves: hm.movesPerMin, headDeg: hm.degPerMin, blink: bl.perMin, spread: (sp.sx + sp.sy) / 2 };
+    if (s.task === 'cpt' && s.mode === 'tap') Object.assign(m, ML.cptScore(s.trials || []));
+    return m;
+  }
+  // 指標の 説明（レポートに 出す）
+  const MDEF = [
+    { k: 'facing', name: '画面を 向いていた 割合', unit: '%', d: 0, better: 'high', tip: '顔が 画面の ほうを 向いていた 時間の 割合。ちゅうい（注意）を むける ことの めやす。' },
+    { k: 'lookAway', name: 'よそ見（1びょう いじょう）', unit: '回', d: 0, better: 'low', tip: '画面から 顔が 1びょう いじょう それた 回数。' },
+    { k: 'longestAway', name: 'いちばん 長い よそ見', unit: 'びょう', d: 1, scale: 0.001, better: 'low', tip: '' },
+    { k: 'headCm', name: '頭の 動き（きょり）', unit: 'cm/分', d: 0, better: 'low', tip: '頭の 位置が 1分間に 動いた きょりの 合計（多動の めやすとして CPT と あわせて 使われる 考え方）。' },
+    { k: 'headMoves', name: '頭が 大きく 動いた 回数', unit: '回/分', d: 1, better: 'low', tip: '0.5びょうで 1.5cm いじょう 動いた 回数。' },
+    { k: 'blink', name: 'まばたき', unit: '回/分', d: 0, better: null, tip: '課題や つかれで かわります。よい／わるいでは なく、その子の ふだんとの ちがいを 見ます。' },
+    { k: 'onScreen', name: '視線が 画面の 中', unit: '%', d: 0, better: 'high', tip: '見る ばしょ あわせ を した ときだけ。' },
+    { k: 'spread', name: '視線の ちらばり', unit: '', d: 2, better: null, tip: '視線の ばらつき（画面の はば＝1）。あちこち 見るほど 大きい。' },
+    { k: 'omissionPct', name: '見のがし（不注意の めやす）', unit: '%', d: 0, better: 'low', tip: 'タッチ する ときに しなかった 割合。' },
+    { k: 'commissionPct', name: 'おしまちがい（衝動性の めやす）', unit: '%', d: 0, better: 'low', tip: 'タッチ しない ときに タッチした 割合。' },
+    { k: 'rtMean', name: '反応の はやさ（平均）', unit: 'ms', d: 0, better: null, tip: '' },
+    { k: 'rtCv', name: '反応の ばらつき', unit: '', d: 2, better: 'low', tip: '反応時間の ばらつき（標準偏差÷平均）。集中が とぎれると 大きく なりやすい。' }
+  ];
+  function renderReport() {
+    const scr = h('section', { class: 'screen scroll rep' });
+    main.appendChild(scr);
+    (async () => {
+      const ss = (await DB.all('sessions')).filter(s => !st.kid || s.kid === st.kid).sort((a, b) => b.at - a.at);
+      const k = curKid();
+      scr.append(h('div', { class: 'rephead' }, h('h2', null, '📊 きろく' + (k ? '：' + k.name : '')),
+        h('button', { class: 'pill', type: 'button', onclick: () => exportCsv(ss) }, '📄 まとめを CSV')));
+      if (!ss.length) { scr.append(h('p', { class: 'help' }, 'まだ 記録が ありません。')); return; }
+      // 課題ごとの うつりかわり
+      ['cpt', 'pair', 'view'].forEach(task => {
+        const list = ss.filter(s => s.task === task).reverse();
+        if (list.length >= 2 && task !== 'view') scr.append(trendCard(task, list));
+      });
+      scr.append(h('div', { class: 'slist' }, ss.map(s => h('button', { class: 'sitem', type: 'button', onclick: () => go(renderSession, s.id) },
+        h('span', { class: 'emo' }, TASKS[s.task].e), h('span', { style: 'flex:1' }, h('b', null, TASKS[s.task].name + (s.imgName ? '：' + s.imgName : '')), h('small', null, fmtDate(s.at) + '・' + s.dur + 'びょう' + (s.cal ? '・あわせ ' + GRADE[s.cal.grade] : '・あわせ なし') + (s.early ? '・とちゅうで おわり' : ''))), '›'))));
+    })();
+  }
+  function trendCard(task, list) {
+    const ms = list.map(metricsOf);
+    const keys = task === 'cpt' ? ['facing', 'headCm', 'omissionPct', 'commissionPct'] : ['facing', 'headCm', 'lookAway'];
+    const cv = h('canvas', { class: 'chart' });
+    setTimeout(() => lineChart(cv, list.map(s => new Date(s.at).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' })), keys.map(k => ({ name: MDEF.find(d => d.k === k).name, vals: ms.map(m => m[k]) }))), 30);
+    return h('div', { class: 'section card' }, h('h3', null, TASKS[task].e + ' ' + TASKS[task].name + ' の うつりかわり（' + list.length + '回）'), cv, h('p', { class: 'help' }, 'それぞれの 線は、その指標の いちばん 大きい 回を 上に して ならべています（単位は ちがいます）。'));
+  }
+  async function renderSession(id) {
+    const s = await DB.get('sessions', id);
+    if (!s) { go(renderReport); return; }
+    const k = kidOf(s.kid), m = metricsOf(s);
+    const prev = (await DB.all('sessions')).filter(x => x.kid === s.kid && x.task === s.task && x.at < s.at && (s.task !== 'cpt' || x.mode === s.mode));
+    const pm = prev.map(metricsOf);
+    const scr = h('section', { class: 'screen scroll rep' });
+    main.appendChild(scr);
+    scr.append(h('div', { class: 'rephead' }, h('h2', null, TASKS[s.task].e + ' ' + TASKS[s.task].name + (s.imgName ? '：' + s.imgName : '')),
+      h('button', { class: 'pill noprint', type: 'button', onclick: () => window.print() }, '🖨️ いんさつ'),
+      h('button', { class: 'pill noprint', type: 'button', onclick: () => exportRaw(s) }, '📄 生データ CSV'),
+      h('button', { class: 'pill danger noprint', type: 'button', onclick: async () => { if (!confirm('この 記録を けしますか？')) return; await DB.del('sessions', s.id); go(renderReport); } }, '🗑️')),
+      h('p', { class: 'help' }, (k ? k.name + '　' : '') + fmtDate(s.at) + '　' + s.dur + 'びょう' + (s.task === 'cpt' ? '　' + (s.mode === 'tap' ? 'タッチ' : 'みるだけ') + '・' + (s.pair || '') : '') + '　見る ばしょ あわせ：' + (s.cal ? GRADE[s.cal.grade] + '（ずれ やく ' + Math.round(s.cal.err * 100) + '%）' : 'なし') + (s.early ? '　※ とちゅうで おわり' : '')));
+    // 信頼度の ちゅうい
+    const warns = [];
+    if (m.present < 80) warns.push('顔が うつっていた 時間が ' + fmt(m.present) + '% でした。カメラの 位置を 見なおすと、より 正確に なります。');
+    if (s.cal && s.cal.grade === 'poor') warns.push('見る ばしょ あわせ が「あらい」ので、視線の ばしょの 指標は 参考に しないで ください。');
+    if (s.dur < 40) warns.push('時間が みじかいので、数字が ぶれやすいです。');
+    if (warns.length) scr.append(h('div', { class: 'note' }, '⚠️ ' + warns.join(' ')));
+    // 指標
+    const show = MDEF.filter(d => m[d.k] != null && !isNaN(m[d.k]) && !(d.k === 'onScreen' && !s.cal) && !(d.k === 'spread' && (!s.cal || s.cal.mode !== 'xy')));
+    scr.append(h('div', { class: 'section' }, h('h3', null, '📌 けっか'), h('div', { class: 'metrics' }, show.map(d => {
+      const v = m[d.k] * (d.scale || 1);
+      const pv = pm.map(x => x[d.k] * (d.scale || 1)).filter(x => x != null && !isNaN(x));
+      let cmp = null;
+      if (pv.length) {
+        const av = ML.mean(pv), sdv = pv.length >= 3 ? ML.sd(pv) : null, diff = v - av;
+        const big = sdv ? Math.abs(diff) > sdv * 1.5 : Math.abs(diff) > Math.abs(av) * 0.3;
+        const arrow = Math.abs(diff) < 1e-9 ? '→' : diff > 0 ? '↑' : '↓';
+        cmp = h('div', { class: 'cmp' }, 'これまで（' + pv.length + '回）の 平均 ' + fmt(av, d.d) + d.unit + '　', h('b', null, arrow + (big ? ' いつもと ちがう' : '')));
+      }
+      return h('div', { class: 'metric', title: d.tip }, h('div', { class: 'k' }, d.name), h('div', { class: 'v' }, fmt(v, d.d), h('small', null, d.unit)), cmp);
+    }))));
+    // 時間の ながれ（4つに わけて）
+    const S = s.stream || [];
+    if (S.length > 40) {
+      const qs = ML.quarters(S, part => ({ f: ML.attention(part).facingPct, hm: ML.headMotion(part).cmPerMin }));
+      const cv = h('canvas', { class: 'chart' });
+      setTimeout(() => barChart(cv, ['はじめ', '2', '3', 'おわり'], [{ name: '画面を 向いていた %', vals: qs.map(q => q.f), color: '#4C6EF5', max: 100 }, { name: '頭の 動き cm/分', vals: qs.map(q => q.hm), color: '#F08C00' }]), 30);
+      scr.append(h('div', { class: 'section card' }, h('h3', null, '⏱️ 時間の ながれ（4つに わけて）'), cv, h('p', { class: 'help' }, 'あとの ほうで 画面を 向く 割合が 下がったり、頭の 動きが ふえたり する ときは、集中が つづく 時間の めやすに なります。')));
+    }
+    if (s.task === 'cpt' && s.mode === 'tap') {
+      const t0 = S.length ? S[0].t : 0, T = S.length ? S[S.length - 1].t - t0 : 1;
+      const parts = [0, 1, 2, 3].map(q => ML.cptScore((s.trials || []).filter(t => t.on - t0 >= T * q / 4 && t.on - t0 < T * (q + 1) / 4 + (q === 3 ? 1 : 0))));
+      const cv = h('canvas', { class: 'chart' });
+      setTimeout(() => barChart(cv, ['はじめ', '2', '3', 'おわり'], [{ name: '見のがし %', vals: parts.map(p => p.omissionPct), color: '#E64980', max: 100 }, { name: 'おしまちがい %', vals: parts.map(p => p.commissionPct), color: '#0CA678', max: 100 }]), 30);
+      scr.append(h('div', { class: 'section card' }, h('h3', null, '⭐ 課題の 正確さ（時間の ながれ）'), cv,
+        h('p', { class: 'help' }, 'タッチ する ' + m.go + '回・しない ' + m.nogo + '回。はやすぎる タッチ（0.15びょう 未満）' + m.anticipations + '回。')));
+    }
+    if (s.task === 'pair') {
+      const sum = ML.pairSummary(s.trials || []);
+      const lab = c => { const t = (s.trials || []).find(x => x.cat === c); return t ? t : { a: 'A', b: 'B', name: c }; };
+      const cv = h('canvas', { class: 'chart', style: 'height:' + (60 + sum.length * 46) + 'px' });
+      setTimeout(() => pairChart(cv, sum.map(x => ({ a: lab(x.cat).a, b: lab(x.cat).b, pct: x.aPct }))), 30);
+      scr.append(h('div', { class: 'section card' }, h('h3', null, '👀 どちらを 長く 見たか'), cv,
+        h('table', { class: 't' }, h('tr', null, ['組', 'A を 見た 割合', 'さきに A を 見た', '見ていた 時間'].map(x => h('th', null, x))),
+          sum.map(x => h('tr', null, h('td', null, lab(x.cat).name), h('td', null, fmt(x.aPct) + '%'), h('td', null, fmt(x.firstAPct) + '%'), h('td', null, fmt(x.lookMs / 1000, 1) + 'びょう')))),
+        h('p', { class: 'help' }, '50% より 大きく かたよる 組（めやす 65% いじょう／35% いか）が、その子の「目が いきやすい もの」の 手がかりです。左右は 入れかえて 2回 見せているので、左右の くせは 打ち消されます。')));
+    }
+    if (s.task === 'view') scr.append(await heatCard(s));
+    // メモ
+    const memo = h('textarea', { class: 'memo', placeholder: 'メモ（その日の ようす・体調・場所・時間帯 など）' }); memo.value = s.memo || '';
+    memo.addEventListener('change', async () => { s.memo = memo.value; await DB.put('sessions', s); toast('メモを ほぞん しました'); });
+    scr.append(h('div', { class: 'section' }, h('h3', null, '📝 メモ'), memo),
+      h('div', { class: 'note info' }, 'ℹ️ この 結果は 診断では ありません。その子の ふだんの ようすを 数字で 見える化し、前の 回と くらべる ための ものです。くわしくは メニュー →「根拠と ちゅうい」。'),
+      h('div', { class: 'row noprint' }, h('button', { class: 'pill', type: 'button', onclick: () => go(renderReport) }, '← きろく いちらん')));
+  }
+  async function heatCard(s) {
+    const im = await imgOf(s.imgId);
+    const S = (s.stream || []).filter(p => p.g && !p.bl);
+    const r = s.rect || { x: 0, y: 0, w: 1, h: 1 };
+    const pts = S.map(p => ({ x: (p.x - r.x) / r.w, y: (p.y - r.y) / r.h })).filter(p => p.x >= -0.05 && p.x <= 1.05 && p.y >= -0.05 && p.y <= 1.05);
+    const box = h('div', { class: 'heat' });
+    const cv = h('canvas');
+    if (im) { const img = h('img'); img.src = im.src; box.append(img, cv); } else box.append(h('p', { class: 'help', style: 'padding:20px' }, '（画像が けされています）'), cv);
+    setTimeout(() => {
+      const W = 120, H = Math.round(120 * (im ? im.height / im.width : 0.75));
+      cv.width = W; cv.height = H;
+      const sig = s.cal && s.cal.grade === 'good' ? 6 : 10;
+      const grid = ML.heatGrid(pts.map(p => ({ x: p.x, y: p.y })), W, H, sig);
+      const g = cv.getContext('2d'), id = g.createImageData(W, H);
+      for (let i = 0; i < grid.length; i++) { const v = grid[i]; const [cr, cg, cb] = v < 0.5 ? [0, 120 + v * 270, 255 - v * 300] : [Math.min(255, (v - 0.5) * 510), 255 - (v - 0.5) * 300, 0]; id.data[i * 4] = cr; id.data[i * 4 + 1] = cg; id.data[i * 4 + 2] = cb; id.data[i * 4 + 3] = v < 0.08 ? 0 : 60 + v * 140; }
+      g.putImageData(id, 0, 0);
+      cv.style.imageRendering = 'auto';
+    }, 30);
+    const aoi = ML.aoiGrid(pts.map(p => ({ t: 0, g: 1, x: p.x, y: p.y })), 3);
+    const fx = ML.fixations(S.map(p => ({ t: p.t, g: 1, bl: 0, x: (p.x - r.x) / r.w, y: (p.y - r.y) / r.h })));
+    const rows = [0, 1, 2].map(y => h('tr', null, [0, 1, 2].map(x => { const c = aoi[y * 3 + x]; return h('td', { style: 'background:rgba(76,110,245,' + (c.pct / 100 * 1.5).toFixed(2) + ')' }, fmt(c.pct) + '%'); })));
+    return h('div', { class: 'section card' }, h('h3', null, '🔥 どこを 見たか（ヒートマップ）'), box,
+      h('div', { class: 'row', style: 'align-items:flex-start' }, h('table', { class: 't' }, rows), h('p', { class: 'help', style: 'flex:1;min-width:220px' }, '左の 表は 画像を 3×3 に わけた ときの 見た 時間の 割合。注視（0.12びょう いじょう 止まった 視線）は ' + fx.length + '回' + (fx.length ? '・さいしょの 注視は ' + ['左上', '上', '右上', '左', 'まんなか', '右', '左下', '下', '右下'][Math.min(2, Math.max(0, Math.floor(fx[0].y * 3))) * 3 + Math.min(2, Math.max(0, Math.floor(fx[0].x * 3)))] : '') + '。' + (s.cal && s.cal.grade !== 'good' ? '見る ばしょ あわせ が「' + GRADE[s.cal.grade] + '」なので、ヒートマップは おおまかな めやすです。' : ''))));
+  }
+
+  /* ---------- グラフ（canvas） ---------- */
+  function prep(cv) { const d = Math.min(2, window.devicePixelRatio || 1), r = cv.getBoundingClientRect(); cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); const g = cv.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, r.width, r.height); g.font = '600 12px sans-serif'; return { g, W: r.width, H: r.height }; }
+  function legend(g, items, x, y) { items.forEach((it, i) => { g.fillStyle = it.color; g.fillRect(x, y + i * 18 - 8, 12, 12); g.fillStyle = '#495057'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(it.name, x + 18, y + i * 18 - 2); }); }
+  function barChart(cv, labels, series) {
+    const { g, W, H } = prep(cv), L = 40, B = 28, T = 16 + series.length * 18, Rr = 16, pw = W - L - Rr, ph = H - T - B;
+    legend(g, series, L, 14);
+    const n = labels.length, gw = pw / n, bw = Math.min(36, gw / (series.length + 1));
+    series.forEach((s, si) => {
+      const mx = s.max || Math.max(1, ...s.vals.filter(v => !isNaN(v))) * 1.15;
+      s.vals.forEach((v, i) => { if (isNaN(v)) return; const hh = ph * clamp(v / mx, 0, 1), x = L + gw * i + (gw - bw * series.length) / 2 + si * bw; g.fillStyle = s.color; g.fillRect(x, T + ph - hh, bw - 4, hh); g.fillStyle = '#343A40'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(fmt(v), x + bw / 2 - 2, T + ph - hh - 2); });
+    });
+    g.strokeStyle = '#DEE2E6'; g.beginPath(); g.moveTo(L, T + ph); g.lineTo(W - Rr, T + ph); g.stroke();
+    g.fillStyle = '#667085'; g.textAlign = 'center'; g.textBaseline = 'top'; labels.forEach((l, i) => g.fillText(l, L + gw * i + gw / 2, T + ph + 6));
+  }
+  function lineChart(cv, labels, series) {
+    const { g, W, H } = prep(cv), COL = ['#4C6EF5', '#F08C00', '#E64980', '#0CA678'], L = 20, B = 26, T = 16 + Math.ceil(series.length / 2) * 18, Rr = 20, pw = W - L - Rr, ph = H - T - B;
+    series.forEach((s, i) => { g.fillStyle = COL[i]; g.fillRect(L + (i % 2) * (W / 2), 6 + Math.floor(i / 2) * 18, 12, 12); g.fillStyle = '#495057'; g.textAlign = 'left'; g.textBaseline = 'top'; g.fillText(s.name, L + (i % 2) * (W / 2) + 18, 6 + Math.floor(i / 2) * 18); });
+    const n = labels.length, x = i => L + (n === 1 ? pw / 2 : pw * i / (n - 1));
+    series.forEach((s, si) => {
+      const v = s.vals.map(z => isNaN(z) ? null : z), ok = v.filter(z => z != null), mx = Math.max(1e-6, ...ok), mn = Math.min(0, ...ok);
+      g.strokeStyle = COL[si]; g.lineWidth = 3; g.beginPath(); let st0 = false;
+      v.forEach((z, i) => { if (z == null) return; const y = T + ph - ph * (z - mn) / (mx - mn || 1); if (!st0) { g.moveTo(x(i), y); st0 = true; } else g.lineTo(x(i), y); }); g.stroke();
+      v.forEach((z, i) => { if (z == null) return; const y = T + ph - ph * (z - mn) / (mx - mn || 1); g.fillStyle = COL[si]; g.beginPath(); g.arc(x(i), y, 4, 0, 7); g.fill(); });
+    });
+    g.fillStyle = '#667085'; g.textAlign = 'center'; g.textBaseline = 'top'; labels.forEach((l, i) => g.fillText(l, x(i), T + ph + 6));
+  }
+  function pairChart(cv, rows) {
+    const { g, W } = prep(cv), L = 110, Rr = 110, bh = 26;
+    rows.forEach((r, i) => {
+      const y = 30 + i * 46, pw = W - L - Rr, a = isNaN(r.pct) ? 50 : r.pct;
+      g.fillStyle = '#4C6EF5'; g.fillRect(L, y, pw * a / 100, bh); g.fillStyle = '#F08C00'; g.fillRect(L + pw * a / 100, y, pw * (1 - a / 100), bh);
+      g.fillStyle = '#212529'; g.font = '700 14px sans-serif'; g.textBaseline = 'middle';
+      g.textAlign = 'right'; g.fillText(r.a + ' ' + fmt(a) + '%', L - 8, y + bh / 2);
+      g.textAlign = 'left'; g.fillText(fmt(100 - a) + '% ' + r.b, L + pw + 8, y + bh / 2);
+    });
+    g.strokeStyle = '#212529'; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(L + (W - L - Rr) / 2, 20); g.lineTo(L + (W - L - Rr) / 2, 30 + rows.length * 46); g.stroke(); g.setLineDash([]);
+  }
+
+  /* ---------- 書き出し ---------- */
+  function download(name, text, type) { const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: type || 'text/csv' })), download: name }); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); toast('💾 ' + name + ' を ほぞん しました'); }
+  function exportCsv(ss) {
+    const cols = MDEF.map(d => d.k);
+    const head = ['日時', 'こども', '課題', '時間(秒)', 'あわせ', 'あわせ誤差'].concat(MDEF.map(d => d.name + (d.unit ? '(' + d.unit + ')' : '')), ['メモ']);
+    const rows = ss.map(s => { const m = metricsOf(s); return [fmtDate(s.at), (kidOf(s.kid) || {}).name || '', TASKS[s.task].name + (s.task === 'cpt' ? '(' + (s.mode === 'tap' ? 'タッチ' : 'みるだけ') + ')' : '') + (s.imgName ? ':' + s.imgName : ''), s.dur, s.cal ? GRADE[s.cal.grade] : 'なし', s.cal ? s.cal.err : ''].concat(cols.map(k => { const d = MDEF.find(x => x.k === k), v = m[k]; return v == null || isNaN(v) ? '' : r3(v * (d.scale || 1)); }), [(s.memo || '').replace(/[\r\n,]/g, ' ')]); });
+    download('まなざしラボ_まとめ.csv', '﻿' + [head].concat(rows).map(r => r.join(',')).join('\n'));
+  }
+  function exportRaw(s) {
+    const head = 't(ms),顔あり,画面を向く,視線あり,x,y,まばたき,頭x(cm),頭y(cm),頭z(cm),yaw,pitch';
+    const rows = (s.stream || []).map(p => [p.t - s.stream[0].t, p.pr, p.f, p.g, p.x == null ? '' : p.x, p.y == null ? '' : p.y, p.bl, p.hx == null ? '' : p.hx, p.hy == null ? '' : p.hy, p.hz == null ? '' : p.hz, p.yaw == null ? '' : p.yaw, p.pitch == null ? '' : p.pitch].join(','));
+    download('まなざしラボ_' + TASKS[s.task].name + '_' + new Date(s.at).toISOString().slice(0, 16).replace(/[:T]/g, '') + '.csv', '﻿' + head + '\n' + rows.join('\n'));
+  }
+
+  /* ============================================================
+     ホーム
+     ============================================================ */
+  function renderHome() {
+    const scr = h('section', { class: 'screen scroll home' });
+    main.appendChild(scr);
+    const k = curKid(), c = k ? calOf(k.id) : null;
+    scr.append(
+      h('div', { class: 'row' }, h('h2', { class: 't', style: 'flex:1' }, '👀 まなざし ラボ'), h('span', { class: 'help' }, '先生用：見る・集中の ようすを 記録して くらべる')),
+      h('div', { class: 'card', style: 'display:flex;flex-direction:column;gap:10px' },
+        h('b', null, 'こども'),
+        h('div', { class: 'kids' }, KIDS.map(x => h('button', { type: 'button', class: 'kid' + (x.id === st.kid ? ' on' : ''), onclick: () => { st.kid = x.id; saveSt(); go(renderHome); } }, '🙂 ' + x.name)),
+          h('button', { type: 'button', class: 'kid add', onclick: addKid }, '＋ くわえる')),
+        h('p', { class: 'help' }, 'なまえは ニックネームや イニシャルに して ください（この 端末の 中だけに 保存されます）。'),
+        k ? h('div', { class: 'row' }, h('span', { class: 'calbadge' + (c ? ' ' + c.quality.grade : '') }, c ? '👀 見る ばしょ あわせ：' + { good: 'よい', ok: 'ふつう', poor: 'あらい' }[c.quality.grade] + '（' + new Date(c.at).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + '）' : '👀 見る ばしょ あわせ：まだ'), h('button', { class: 'pill', type: 'button', onclick: () => go(() => runCalib(() => go(renderHome))) }, '🎯 いま あわせる')) : null),
+      h('div', { class: 'tasks' },
+        tcard('⭐', 'しゅうちゅう チャレンジ', '「いぬが 出たら タッチ」の 課題で、見のがし・おしまちがい・反応の ばらつき・頭の 動き・よそ見を はかります（2〜5分）。', 'CPT', renderCptSetup),
+        tcard('👀', 'どっちを みる？', '左右に ならべた 2つの うち、どちらを 長く・さきに 見るか。「どんな 刺激に 目が いきやすいか」を さがします。', '視線', renderPairSetup),
+        tcard('🖼️', 'きょうざいを みる', '教材や プリントの 写真を 見せて、どこを 見たかを ヒートマップに します。', '視線', renderViewSetup),
+        tcard('📊', 'きろく・レポート', '結果の くわしい 見かた・前の 回との くらべ・印刷・CSV。', '', renderReport)),
+      h('div', { class: 'note info' }, 'ℹ️ この ツールは 診断を する ものでは ありません。その子の ようすを 数字に して、前の 自分と くらべる ための ものです。はかる 前に メニュー →「根拠と ちゅうい」を 一度 読んで ください。'));
+  }
+  function tcard(e, name, desc, tag, fn) { return h('button', { class: 'tcard', type: 'button', onclick: () => { A(); if (fn !== renderReport && !curKid()) { toast('さいしょに こどもを えらんで ください'); return; } go(fn); } }, h('span', { class: 'emo' }, e), h('span', null, h('b', null, name), h('small', null, desc)), tag ? h('span', { class: 'tag' }, tag) : null); }
+  async function addKid() {
+    const name = (prompt('こどもの なまえ（ニックネーム・イニシャル）') || '').trim(); if (!name) return;
+    const k = { id: uid(), name, at: Date.now() }; await DB.put('kids', k); KIDS.push(k); st.kid = k.id; saveSt(); go(renderHome);
+  }
+
+  /* ============================================================
+     メニュー
+     ============================================================ */
+  let mTab = 'set';
+  function openMenu(tab) { if (tab) mTab = tab; renderMenu(); $('#menu').classList.add('open'); }
+  function closeMenu() { $('#menu').classList.remove('open'); }
+  $('#menuBtn').addEventListener('click', () => openMenu());
+  $('#mClose').addEventListener('click', closeMenu);
+  $('#menu').addEventListener('click', e => { if (e.target.id === 'menu') closeMenu(); });
+  $('#homeBtn').addEventListener('click', () => go(renderHome));
+  function renderMenu() {
+    const tabs = $('#mTabs'); tabs.innerHTML = '';
+    [['set', '🛠️ せってい'], ['data', '💾 データ'], ['doc', '📚 根拠と ちゅうい'], ['lic', '📜 ライセンス']].forEach(([k, t]) => tabs.append(h('button', { type: 'button', class: mTab === k ? 'on' : '', onclick: () => { mTab = k; renderMenu(); } }, t)));
+    const b = $('#mBody'); b.innerHTML = '';
+    if (mTab === 'set') {
+      const seg = (label, key, opts, help) => h('div', { class: 'row' }, h('b', { style: 'min-width:150px' }, label), h('div', { class: 'seg' }, opts.map(([v, t]) => h('button', { type: 'button', class: st[key] === v ? 'on' : '', onclick: () => { st[key] = v; saveSt(); renderMenu(); } }, t))), help ? h('small', { class: 'help' }, help) : null);
+      b.append(
+        seg('見る ばしょ あわせ', 'calPts', [[9, '9点（ていねい）'], [5, '5点'], [3, '3点（左右だけ）']], '「きょうざいを みる」は 5点 いじょうが ひつよう。じっと 見るのが むずかしい 子は 少ない 点で。'),
+        seg('カメラの 小窓', 'preview', [[true, 'だす'], [false, 'ださない']], '課題中、右下に カメラの 映像と「よい いち」かどうかを 出す（子どもが 気に なる ときは「ださない」）'),
+        seg('音・こえ', 'sound', [[true, 'だす'], [false, 'ださない']]),
+        seg('しらべる 表示', 'debug', [[false, 'ださない'], [true, 'だす']], '先生用：視線の 点・fps を 画面に 出す'),
+        h('p', { class: 'help' }, '© 2026 MieeL　学校や家庭での利用は自由です（無断転載・再配布・販売はお断り）。くわしくは「📜 ライセンス」'));
+    } else if (mTab === 'data') {
+      b.append(h('p', { class: 'help' }, '記録は この 端末の ブラウザの 中だけに あります（どこにも 送りません）。ブラウザの データを けすと きえるので、ときどき「バックアップ」を して ください。'),
+        h('div', { class: 'row' },
+          h('button', { class: 'pill', type: 'button', onclick: backup }, '💾 バックアップを ほぞん'),
+          h('button', { class: 'pill', type: 'button', onclick: restore }, '📥 バックアップから もどす')),
+        h('div', { class: 'row' }, KIDS.map(k => h('button', { class: 'pill danger', type: 'button', onclick: async () => { if (!confirm('「' + k.name + '」と その 記録を ぜんぶ けしますか？')) return; for (const s of (await DB.all('sessions')).filter(x => x.kid === k.id)) await DB.del('sessions', s.id); await DB.del('kids', k.id); await DB.del('calibs', k.id); KIDS = KIDS.filter(x => x !== k); if (st.kid === k.id) st.kid = ''; saveSt(); renderMenu(); go(renderHome); } }, '🗑️ ' + k.name + ' を けす'))));
+    } else if (mTab === 'doc') renderDoc(b);
+    else renderLicense(b);
+  }
+  async function backup() {
+    const blobTo64 = b => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
+    const imgs = await DB.all('images');
+    const data = { format: 'mieel-manazashi', v: 1, at: new Date().toISOString(), kids: await DB.all('kids'), sessions: await DB.all('sessions'), calibs: await DB.all('calibs'), images: await Promise.all(imgs.map(async i => Object.assign({}, i, { blob: await blobTo64(i.blob) }))) };
+    download('まなざしラボ_バックアップ_' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(data), 'application/json');
+  }
+  function restore() {
+    const fi = $('#fileIn'); fi.accept = '.json,application/json'; fi.value = '';
+    fi.onchange = async () => {
+      const f = fi.files && fi.files[0]; if (!f) return;
+      try {
+        const j = JSON.parse(await f.text()); if (j.format !== 'mieel-manazashi') throw new Error('format');
+        for (const k of j.kids || []) await DB.put('kids', k);
+        for (const s of j.sessions || []) await DB.put('sessions', s);
+        for (const c of j.calibs || []) await DB.put('calibs', c);
+        for (const i of j.images || []) { const r = await fetch(i.blob); await DB.put('images', Object.assign({}, i, { blob: await r.blob() })); }
+        KIDS = await DB.all('kids'); await loadCals(); toast('もどしました（こども ' + (j.kids || []).length + '人・記録 ' + (j.sessions || []).length + 'こ）', 3500); closeMenu(); go(renderHome);
+      } catch (e) { toast('よみこめませんでした（まなざしラボの バックアップを えらんでください）', 3500); }
+    };
+    fi.click();
+  }
+  function renderDoc(b) {
+    b.innerHTML = `<div class="doc">
+    <h3>この ツールで わかる こと</h3>
+    <p>iPad の 前面カメラで 顔と 目の 位置を 読みとり、課題中の「画面を 向いていた 割合」「よそ見」「頭の 動き」「まばたき」と、見る ばしょ あわせ（キャリブレーション）を した ときは「どこを 見ていたか」を 記録します。<b>同じ 子の 記録を くりかえし とって、前の 自分と くらべる</b> ことで、集中が つづく 時間・集中しやすい 条件・目が いきやすい 刺激を さがす ための 道具です。</p>
+    <h3>根拠に している 考え方</h3>
+    <p><b>持続的注意課題（CPT）</b>：一定の 時間、決まった 刺激に だけ 反応する 課題です。反応しなかった 割合（見のがし）は 不注意の、反応しては いけない ときの 反応（おしまちがい）は 衝動性の めやすとして、注意の 評価に 広く 使われています。反応時間の ばらつきも 注意の ゆらぎの 指標と されます。</p>
+    <p><b>課題中の 頭の 動き</b>：CPT と 赤外線カメラによる 頭の 動きの 計測を 組み合わせた 検査（QbTest）が 医療機関で ADHD の 評価の 補助に 使われています。ただし 15の 研究の まとめ（2023年）では、ADHD の ある人を 正しく 見分けたのは 約78%・ない人は 約70% で、<b>それだけで 判断できる 正確さは ない</b> と されています（<a href="https://psychcentral.com/adhd/computerized-testing-for-adhd-is-it-useful" target="_blank" rel="noopener">解説</a>・<a href="https://www.nice.org.uk/advice/mib318/chapter/The-technology" target="_blank" rel="noopener">NICE</a>）。</p>
+    <p><b>まばたき</b>：課題の むずかしさや 状態で かわり、目に 入る 刺激の まえで おさえられる ことが 知られています。一方で、ADHD の ある 子と ない 子で まばたきの 回数に 差が 見られなかった 研究も あります（<a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5281678/" target="_blank" rel="noopener">子どもの まばたきの 研究</a>）。<b>よい／わるいの 指標では なく</b>、その子の ふだんとの ちがいを 見る ために 出しています。</p>
+    <p><b>2つ ならべて 見せる 方法（選好注視）</b>：乳幼児の 研究で 長く 使われてきた 方法で、どちらを 長く 見るかで 好みや 気づきを 調べます。左右を 入れかえて 2回 見せ、左右の くせを 打ち消して います。</p>
+    <p><b>ウェブカメラでの 視線計測</b>：子どもでも 研究に 使われていますが、専用の アイトラッカーより ぶれが 大きい ことが 報告されています（<a href="https://www.cambridge.org/core/services/aop-cambridge-core/content/view/F28BD05F1D529D3ADE04F2E28A5EE4CB/S0305000924000175a.pdf/assessing-two-methods-of-webcam-based-eye-tracking-for-child-language-research.pdf" target="_blank" rel="noopener">子どもでの 比較研究</a>）。この ツールでも、見る ばしょ あわせの 結果（ずれ）を 毎回 記録し、ずれが 大きい ときは 視線の 指標を 使わないように しています。</p>
+    <h3>だいじな ちゅうい</h3>
+    <p>・<b>診断では ありません。</b>「多動」「不注意」などを この 結果だけで 判断しないで ください。気に なる ときは 医療・専門機関と 相談して ください。<br>
+    ・<b>くらべるのは その子 自身。</b>ほかの 子との くらべや 基準値は ありません。同じ 時間帯・同じ 場所・同じ 姿勢・同じ 課題で、<b>3回 いじょう</b> とると 傾向が 見えて きます（「これまでの 平均」と 自動で くらべます）。<br>
+    ・<b>体調・ねむけ・薬・部屋の 明るさ・すわり方</b>で 数字は かわります。メモに のこして ください。<br>
+    ・保護者の 了解を 得てから つかって ください。</p>
+    <h3>プライバシー</h3>
+    <p>カメラの 映像は 保存も 送信も しません。顔の 点の 動き（数字）だけを この 端末の 中に 保存します。なまえは ニックネームに して ください。</p>
+    </div>`;
+  }
+  function renderLicense(b) {
+    b.innerHTML = `<div class="lic">
+      <h3>このアプリ</h3>
+      <p><b>© 2026 MieeL（ミエル）</b>　<a href="https://www.mieel-support-school.com/" target="_blank" rel="noopener">www.mieel-support-school.com</a><br>
+      学校・家庭・放課後等デイサービス・療育機関などで、子どもの学習や支援のために使うことは自由です（費用はかかりません）。<br>
+      プログラム・画像・文章の無断転載・複製、改変しての公開・再配布、販売、有料の サービスや 商品への 組みこみは お断りします。くわしくは <a href="LICENSE.md" target="_blank" rel="noopener">LICENSE.md</a> を ご覧ください。</p>
+      <h3>使っている ソフトウェア</h3>
+      <div class="licitem"><b>MediaPipe Tasks Vision</b>（@mediapipe/tasks-vision 1.1.0）・モデル：face_landmarker<br>
+      Copyright The MediaPipe Authors / Google LLC<br>
+      Apache License, Version 2.0 で 公開されています。<a href="https://github.com/google-ai-edge/mediapipe" target="_blank" rel="noopener">github.com/google-ai-edge/mediapipe</a><br>
+      このアプリでは 変更せずに そのまま 同梱しています（vendor/ フォルダ）。<br>
+      <button class="pill" type="button" id="licFull" style="margin-top:8px">📄 Apache License 2.0 の 全文を ひょうじ</button>
+      <pre id="licText" hidden></pre></div>
+      <div class="licitem"><b>絵文字</b>　iPad・パソコンに 入っている 標準の 絵文字フォントで 表示しています（アプリには ふくまれていません）。</div>
+      <h3>プライバシー</h3>
+      <p>カメラの 映像は 保存も 送信も しません。読み取りは すべて この端末の 中で 行います。記録は この端末の 中だけに 保存されます。</p>
+    </div>`;
+    const btn = b.querySelector('#licFull'), pre = b.querySelector('#licText');
+    btn.addEventListener('click', async () => {
+      if (!pre.hidden) { pre.hidden = true; return; }
+      pre.hidden = false; pre.textContent = 'よみこみ ちゅう…';
+      try { const r = await fetch('vendor/LICENSE-APACHE-2.0.txt'); pre.textContent = r.ok ? await r.text() : 'https://www.apache.org/licenses/LICENSE-2.0'; } catch (e) { pre.textContent = 'オフラインの ため 表示できません。https://www.apache.org/licenses/LICENSE-2.0'; }
+    });
+  }
+  function makeTouchIcon() { try { const c = document.createElement('canvas'); c.width = c.height = 180; const g = c.getContext('2d'); g.fillStyle = '#BAC8FF'; g.fillRect(0, 0, 180, 180); g.font = '118px "Apple Color Emoji","Segoe UI Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('👀', 90, 98); $('#touchIcon').href = c.toDataURL(); } catch (e) { /* 無視 */ } }
+
+  /* ============================================================
+     はじまり
+     ============================================================ */
+  if (canSpeak) { loadVoice(); speechSynthesis.onvoiceschanged = loadVoice; }
+  document.addEventListener('pointerdown', function unlock() { A(); }, { once: true });
+  makeTouchIcon();
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  (async () => {
+    try { KIDS = (await DB.all('kids')).sort((a, b) => a.at - b.at); await loadCals(); } catch (e) { console.warn(e); }
+    if (st.kid && !kidOf(st.kid)) st.kid = '';
+    go(renderHome);
+    setTimeout(() => loadVision().catch(() => {}), 1500);
+  })();
+  window.__ml = { V, st, DB, CAL, get kids() { return KIDS; }, metricsOf, go, renderSession, renderReport };
+
+})();
+</script>
+</body>
+</html>
